@@ -30,6 +30,7 @@ class UVM_gen_file < UVM_gen_base
     end
     
     def to_f
+        puts "Generating file: #{@file}"
         f = File::new(@file, "w")
         f.puts to_s
         f.close
@@ -225,6 +226,68 @@ class UVM_gen_mon < UVM_gen_file
 
 end
 
+
+# UVM generator - sequencer class
+# This class is used to generate a sequencer
+#class UVM_gen_seqr < UVM_gen_file
+#
+#    def initialize(name, file)
+#        super(name, file)
+#    end
+#    
+#    def to_s
+#        s = "class #{@name}_sequencer extends uvm_sequencer #(#{@name}_item);\n\n"
+#        s += "  `uvm_component_utils(#{@name}_sequencer)\n\n"
+#        s += "  // Constructor\n"
+#        s += "  function new (string name, uvm_component parent);\n"
+#        s += "    super.new(name, parent);\n"
+#        s += "  endfunction: new\n\n"
+#        s += "endclass: #{@name}_sequencer\n"
+#    end
+#
+#end
+
+# UVM generator - agent class
+# This class is used to generate a agent
+class UVM_gen_agent < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = "class #{@name}_agent extends uvm_agent;\n\n"
+        s += "  // UVM automation macros\n"
+        s += "  `uvm_component_utils(#{@name}_agent)\n\n"
+        s += "  // Constructor\n"
+        s += "  function new (string name, uvm_component parent);\n"
+        s += "    super.new(name, parent);\n"
+        s += "  endfunction: new\n\n"
+        s += "  uvm_sequencer #(#{@name}_item) sequencer;\n"
+        s += "  #{@name}_driver driver;\n"
+        s += "  #{@name}_monitor monitor;\n\n"
+        s += "  // Use build_phase to create agents's subcomponents\n"
+        s += "  virtual function void build_phase(uvm_phase phase);\n"
+        s += "    super.build_phase(phase)\n"
+        s += "    monitor = #{@name}_monitor::type_id::create(\"monitor\",this);\n"
+        s += "    if (is_active == UVM_ACTIVE) begin\n"
+        s += "      // Build the sequencer and driver\n"
+        s += "      sequencer =\n"
+        s += "      uvm_sequencer#(#{@name}_item)::type_id::create(\"sequencer\",this);\n"
+        s += "      driver = #{@name}_driver::type_id::create(\"driver\",this);\n"
+        s += "    end\n\n"
+        s += "  endfunction: build_phase\n\n"
+        s += "  virtual function void connect_phase(uvm_phase phase);\n"
+        s += "    if(is_active == UVM_ACTIVE) begin\n"
+        s += "      driver.seq_item_port.connect(sequencer.seq_item_export);\n"
+        s += "    end\n"
+        s += "  endfunction: connect_phase\n\n"
+        s += "endclass: #{@name}_agent\n"
+    end
+    
+end
+
+
 # Only run the following code when this file is the main file being run
 # instead of having been required or loaded by another file
 if __FILE__ == $0 
@@ -366,27 +429,26 @@ if __FILE__ == $0
     
     
     # Gen the interface
-    intf = UVM_gen_if.new(env_name, 
-        out_dir+"/"+env_name+"_if.sv", port_list)
-    puts "Generating file: #{out_dir}/#{env_name}_if.sv"
-    #puts intf.to_s
+    intf = UVM_gen_if.new(env_name, out_dir+"/"+env_name+"_if.sv", port_list)
     intf.to_f
     
     # Gen the data item
     item = UVM_gen_item.new(env_name, out_dir+"/"+env_name+"_item.sv")
-    puts "Generating file: #{out_dir}/#{env_name}_item.sv"
-    #puts item.to_s
 	item.to_f
     
     # Gen the driver
     driver = UVM_gen_drv.new(env_name, out_dir+"/"+env_name+"_driver.sv")
-    puts "Generating file: #{out_dir}/#{env_name}_driver.sv"
-    #puts driver.to_s
 	driver.to_f
 
 	# Gen the monitor
     monitor = UVM_gen_mon.new(env_name, out_dir+"/"+env_name+"_monitor.sv")
-    puts "Generating file: #{out_dir}/#{env_name}_monitor.sv"
-    #puts monitor.to_s
 	monitor.to_f
+    
+    # Gen the sequencer
+    #sequencer = UVM_gen_seqr.new(env_name, out_dir+"/"+env_name+"_sequencer.sv")
+	#sequencer.to_f
+    
+    # Gen the agent
+    agent = UVM_gen_agent.new(env_name, out_dir+"/"+env_name+"_agent.sv")
+	agent.to_f
 end
