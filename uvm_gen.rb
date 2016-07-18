@@ -76,6 +76,8 @@ class UVM_gen_if < UVM_gen_file
         @p_list.each do |p|
             s += "  logic #{p.width} #{p.name}; //#{p.type}\n"
         end
+
+        s += "\n"
         s += "endinterface: #{@name}_if\n"
         
     end
@@ -98,11 +100,11 @@ class UVM_gen_item < UVM_gen_file
         s += "  constraint c1 {addr < 16'h2000;}\n"
         s += "  constraint c2 {data < 16'h1000;}\n\n" 
         s += "  //UVM automation macros for general objects\n"
-        s += "  ovm_object_utils_begin(#{@name}_item)\n"
-        s += "    ovm_field_int(addr, UVM_ALL_ON)\n"
-        s += "    ovm_field_int(data, UVM_ALL_ON)\n"
-        s += "    ovm_field_int(delay, UVM_ALL_ON)\n"
-        s += "  ovm_object_utils_end\n\n" 
+        s += "  `uvm_object_utils_begin(#{@name}_item)\n"
+        s += "    `uvm_field_int(addr, UVM_ALL_ON)\n"
+        s += "    `uvm_field_int(data, UVM_ALL_ON)\n"
+        s += "    `uvm_field_int(delay, UVM_ALL_ON)\n"
+        s += "  `uvm_object_utils_end\n\n" 
         s += "  // Constructor\n"
         s += "  function new (string name = \"#{@name}_item\");\n"
         s += "    super.new(name);\n"
@@ -122,37 +124,102 @@ class UVM_gen_drv < UVM_gen_file
     end
     
     def to_s
-        s = 'class simple_driver extends uvm_driver #(simple_item);
-simple_item s_item;
-virtual dut_if vif;
-// UVM automation macros for general components
-ovm_component_utils(simple_driver) 
-// Constructor
-function new (string name = "simple_driver", uvm_component parent);
-super.new(name, parent);
-endfunction : new
-function void build_phase(uvm_phase phase);
-string inst_name;
-super.build_phase(phase);
-if(!uvm_config_db#(virtual dut_if)::get(this,
-"","vif",vif))
-ovm_fatal("NOVIF",
-{"virtual interface must be set for: ",
-get_full_name(),".vif"});
-endfunction : build_phase
-task run_phase(uvm_phase phase);
-forever begin
-// Get the next data item from sequencer (may block).
-seq_item_port.get_next_item(s_item);
-// Execute the item.
-drive_item(s_item);
-seq_item_port.item_done(); // Consume the request.
+        s = "class #{@name}_driver extends uvm_driver #(#{@name}_item);\n\n"
+        s += "  #{@name}_item item;\n"
+        s += "  virtual #{@name}_if vif;\n\n"
+        s += "  // UVM automation macros for general components\n"
+        s += "  `uvm_component_utils(#{@name}_driver)\n\n"
+        s += "  // Constructor\n"
+        s += "  function new (string name = \"#{@name}_driver\", uvm_component parent);\n"
+        s += "    super.new(name, parent);\n"
+        s += "  endfunction: new\n\n"
+        s += "  function void build_phase(uvm_phase phase);\n"
+        s += "    string inst_name;\n"
+        s += "    super.build_phase(phase);\n"
+        s += "    if (!uvm_config_db#(virtual #{@name}_if)::get(this,\"\",\"vif\",vif))\n"
+        s += "      uvm_fatal(\"NOVIF\", {\"virtual interface must be set for: \",\n"
+        s += "      get_full_name(),\".vif\"});\n"
+        s += "  endfunction: build_phase\n\n"
+        s += "  virtual task run_phase(uvm_phase phase);\n"
+        s += "    forever begin\n"
+        s += "      // Get the next data item from sequencer (may block)\n"
+        s += "      seq_item_port.get_next_item(item);\n"
+        s += "      // Execute the item\n"
+        s += "      drive_item(item);\n"
+        s += "      seq_item_port.item_done(); // Consume the request\n"
+        s += "     end\n"
+        s += "  endtask: run\n\n"
+        s += "  virtual task drive_item (input #{@name}_item item);\n"
+        s += "    // Add your logic here.\n"
+        s += "  endtask: drive_item\n\n"
+        s += "endclass: #{@name}_driver\n"
+        
+    end
+
 end
-endtask : run
-task drive_item (input simple_item item);
-... // Add your logic here.
-endtask : drive_item
-endclass : simple_driver'
+
+# UVM generator - monitor class
+# This class is used to generate a monitor
+class UVM_gen_mon < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = "class #{@name}_monitor extends uvm_monitor;\n\n"
+        s += "  virtual #{@name}_if vif;\n\n"
+		s += "  bit checks_enable = 1; // Control checking in monitor and interface\n"
+        s += "  bit coverage_enable = 1; // Control coverage in monitor and interface\n"
+		s += "  uvm_analysis_port #(#{@name}_item) item_collected_port;\n"
+        s += "  event cov_transaction; // Events needed to trigger covergroups\n"
+        s += "  protected #{@name}_item trans_collected;\n\n"
+        s += "  // UVM automation macros for general components\n"
+        s += "  `uvm_component_utils_begin(#{@name}_monitor)\n"
+		s += "    `uvm_field_int(checks_enable, UVM_ALL_ON)\n"
+        s += "    `uvm_field_int(coverage_enable, UVM_ALL_ON)\n"
+        s += "  `uvm_component_utils_end\n\n"
+        s += "  // Coverage\n"
+		s += "  covergroup cov_trans @cov_transaction;\n"
+        s += "  option.per_instance = 1;\n"
+        s += "    // Coverage bins definition\n"
+        s += "  endgroup: cov_trans\n\n"
+        s += "  // Constructor\n"
+        s += "  function new (string name = \"#{@name}_monitor\", uvm_component parent);\n"
+        s += "    super.new(name, parent);\n"
+		s += "      cov_trans = new();\n"
+        s += "      cov_trans.set_inst_name({get_full_name(), \".cov_trans\"});\n"
+        s += "      trans_collected = new();\n"
+        s += "      item_collected_port = new(\"item_collected_port\", this);\n"
+        s += "  endfunction: new\n\n"
+        s += "  function void build_phase(uvm_phase phase);\n"
+        s += "    string inst_name;\n"
+        s += "    super.build_phase(phase);\n"
+        s += "    if (!uvm_config_db#(virtual #{@name}_if)::get(this,\"\",\"vif\",vif))\n"
+        s += "      uvm_fatal(\"NOVIF\", {\"virtual interface must be set for: \",\n"
+        s += "      get_full_name(),\".vif\"});\n"
+        s += "  endfunction: build_phase\n\n"
+        s += "  virtual task run_phase(uvm_phase phase);\n"
+		s += "    collect_transactions(); // collector task\n"
+        s += "  endtask: run\n\n"
+        s += "  virtual protected task collect_transactions();\n"
+        s += "    forever begin\n"
+		s += "      @(posedge vif.clock);\n"
+        s += "      // Collect the data from the bus into trans_collected\n"
+        s += "      if (checks_enable)\n"
+        s += "        perform_transfer_checks();\n"
+        s += "      if (coverage_enable)\n"
+        s += "        perform_transfer_coverage();\n"
+        s += "      item_collected_port.write(trans_collected);\n"
+        s += "    end\n"
+        s += "  endtask: collect_transactions\n\n"
+		s += "  virtual protected function void perform_transfer_coverage();\n"
+        s += "    -> cov_transaction;\n"
+        s += "  endfunction : perform_transfer_coverage\n\n"
+        s += "  virtual protected function void perform_transfer_checks();\n"
+        s += "    // Perform data checks on trans_collected.\n"
+        s += "  endfunction : perform_transfer_checks\n\n"
+        s += "endclass: #{@name}_monitor\n"
         
     end
 
@@ -269,7 +336,7 @@ if __FILE__ == $0
     env_name = options[:env_name]
     mod_file = options[:mod_file]
     out_dir  = options[:output_dir]
-    out_dir.chop! if out_dir[-1] = '/'
+    out_dir.chop! if out_dir[-1] == '/'
     
     
     # Check the ports
@@ -302,12 +369,24 @@ if __FILE__ == $0
     intf = UVM_gen_if.new(env_name, 
         out_dir+"/"+env_name+"_if.sv", port_list)
     puts "Generating file: #{out_dir}/#{env_name}_if.sv"
+    #puts intf.to_s
     intf.to_f
     
     # Gen the data item
     item = UVM_gen_item.new(env_name, out_dir+"/"+env_name+"_item.sv")
     puts "Generating file: #{out_dir}/#{env_name}_item.sv"
-    puts item.to_s
+    #puts item.to_s
+	item.to_f
     
+    # Gen the driver
+    driver = UVM_gen_drv.new(env_name, out_dir+"/"+env_name+"_driver.sv")
+    puts "Generating file: #{out_dir}/#{env_name}_driver.sv"
+    #puts driver.to_s
+	driver.to_f
 
+	# Gen the monitor
+    monitor = UVM_gen_mon.new(env_name, out_dir+"/"+env_name+"_monitor.sv")
+    puts "Generating file: #{out_dir}/#{env_name}_monitor.sv"
+    #puts monitor.to_s
+	monitor.to_f
 end
