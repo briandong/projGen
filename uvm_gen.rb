@@ -288,6 +288,65 @@ class UVM_gen_agent < UVM_gen_file
     
 end
 
+# UVM generator - env class
+# This class is used to generate env
+class UVM_gen_env < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = "class #{@name}_env extends uvm_env;\n\n"
+        s += "  int num_masters;\n"
+        s += "  #{@name}_agent masters[];\n\n"
+        s += "  `uvm_component_utils_begin(#{@name}_env)\n"
+        s += "    `uvm_field_int(num_masters, UVM_ALL_ON)\n"
+        s += "  `uvm_component_utils_end\n\n"
+        s += "  virtual function void build_phase(phase);\n"
+        s += "    string inst_name;\n"
+        s += "    super.build_phase(phase);\n\n"
+        s += "    if(num_masters ==0))\n"
+        s += "      `uvm_fatal(\"NONUM\",{\"'num_masters' must be set\";\n\n"
+        s += "    masters = new[num_masters];\n"
+        s += "    for(int i = 0; i < num_masters; i++) begin\n"
+        s += "      $sformat(inst_name, \"masters[%0d]\", i);\n"
+        s += "      masters[i] = #{@name}_agent::type_id::create(inst_name, this);\n"
+        s += "    end\n\n"
+        s += "    // Build slaves and other components\n\n"
+        s += "  endfunction\n\n"
+        s += "  // Constructor\n"
+        s += "  function new(string name, uvm_component parent);\n"
+        s += "    super.new(name, parent);\n"
+        s += "  endfunction: new\n\n"
+        s += "endclass\n"
+    end
+    
+end
+
+# UVM generator - pkg class
+# This class is used to generate pkg
+class UVM_gen_pkg < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = "package #{@name}_pkg;\n\n"
+        s += "  import uvm_pkg::*;\n"
+        s += "  `include \"uvm_macros.svh\"\n\n"
+        s += "  `include \"#{@name}_if.sv\"\n"
+        s += "  `include \"#{@name}_item.sv\"\n"
+        s += "  `include \"#{@name}_driver.sv\"\n"
+        s += "  `include \"#{@name}_monitor.sv\"\n"
+        s += "  `include \"#{@name}_agent.sv\"\n"
+        s += "  `include \"#{@name}_env.sv\"\n\n"
+        s += "endpackage: #{@name}_pkg\n"
+    end
+    
+end
+
 
 # Only run the following code when this file is the main file being run
 # instead of having been required or loaded by another file
@@ -452,4 +511,12 @@ if __FILE__ == $0
     # Gen the agent
     agent = UVM_gen_agent.new(env_name, out_dir+"/"+env_name+"_agent.sv")
 	agent.to_f
+    
+    # Gen the env
+    env = UVM_gen_env.new(env_name, out_dir+"/"+env_name+"_env.sv")
+	env.to_f
+    
+    # Gen the pkg
+    pkg = UVM_gen_pkg.new(env_name, out_dir+"/"+env_name+"_pkg.sv")
+	pkg.to_f
 end
