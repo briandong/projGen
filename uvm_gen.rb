@@ -229,23 +229,24 @@ end
 
 # UVM generator - sequencer class
 # This class is used to generate a sequencer
-#class UVM_gen_seqr < UVM_gen_file
-#
-#    def initialize(name, file)
-#        super(name, file)
-#    end
-#    
-#    def to_s
-#        s = "class #{@name}_sequencer extends uvm_sequencer #(#{@name}_item);\n\n"
-#        s += "  `uvm_component_utils(#{@name}_sequencer)\n\n"
-#        s += "  // Constructor\n"
-#        s += "  function new (string name, uvm_component parent);\n"
-#        s += "    super.new(name, parent);\n"
-#        s += "  endfunction: new\n\n"
-#        s += "endclass: #{@name}_sequencer\n"
-#    end
-#
-#end
+# But you could also skip this and use the default uvm_sequencer in agent class
+class UVM_gen_seqr < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = "class #{@name}_sequencer extends uvm_sequencer #(#{@name}_item);\n\n"
+        s += "  `uvm_component_utils(#{@name}_sequencer)\n\n"
+        s += "  // Constructor\n"
+        s += "  function new (string name, uvm_component parent);\n"
+        s += "    super.new(name, parent);\n"
+        s += "  endfunction: new\n\n"
+        s += "endclass: #{@name}_sequencer\n"
+    end
+
+end
 
 # UVM generator - agent class
 # This class is used to generate a agent
