@@ -75,7 +75,12 @@ class UVM_gen_if < UVM_gen_file
         s += "  // Actual signals\n"
         
         @p_list.each do |p|
-            s += "  logic #{p.width} #{p.name}; //#{p.type}\n"
+            if p.type == "inout"
+				s += "  wire "
+			else
+				s += "  logic "
+			end
+            s += "#{p.width} #{p.name}; //#{p.type}\n"
         end
 
         s += "\n"
@@ -148,10 +153,12 @@ class UVM_gen_drv < UVM_gen_file
         s += "      // Execute the item\n"
         s += "      drive_item(item);\n"
         s += "      seq_item_port.item_done(); // Consume the request\n"
-        s += "     end\n"
+        s += "    end\n"
         s += "  endtask: run_phase\n\n"
         s += "  virtual task drive_item (input #{@name}_item item);\n"
         s += "    // Add your logic here.\n"
+		s += "    `uvm_info(get_type_name(), \"driving item\", UVM_LOW)\n"
+        s += "    #10;\n"
         s += "  endtask: drive_item\n\n"
         s += "endclass: #{@name}_driver\n"
         
@@ -204,15 +211,15 @@ class UVM_gen_mon < UVM_gen_file
 		s += "    collect_transactions(); // collector task\n"
         s += "  endtask: run_phase\n\n"
         s += "  virtual protected task collect_transactions();\n"
-        s += "    forever begin\n"
-		s += "      @(posedge vif.clock);\n"
+        s += "    //forever begin\n"
+		s += "      //@(posedge vif.clock);\n"
         s += "      // Collect the data from the bus into trans_collected\n"
         s += "      if (checks_enable)\n"
         s += "        perform_transfer_checks();\n"
         s += "      if (coverage_enable)\n"
         s += "        perform_transfer_coverage();\n"
         s += "      item_collected_port.write(trans_collected);\n"
-        s += "    end\n"
+        s += "    //end\n"
         s += "  endtask: collect_transactions\n\n"
 		s += "  virtual protected function void perform_transfer_coverage();\n"
         s += "    -> cov_transaction;\n"
@@ -258,8 +265,11 @@ class UVM_gen_agent < UVM_gen_file
     
     def to_s
         s = "class #{@name}_agent extends uvm_agent;\n\n"
+		s += "  uvm_active_passive_enum is_active;\n\n"
         s += "  // UVM automation macros\n"
-        s += "  `uvm_component_utils(#{@name}_agent)\n\n"
+        s += "  `uvm_component_utils_begin(#{@name}_agent)\n"
+		s += "    `uvm_field_enum(uvm_active_passive_enum, is_active, UVM_ALL_ON)\n"
+        s += "  `uvm_component_utils_end\n\n"
         s += "  // Constructor\n"
         s += "  function new (string name, uvm_component parent);\n"
         s += "    super.new(name, parent);\n"
@@ -298,7 +308,11 @@ class UVM_gen_env < UVM_gen_file
     
     def to_s
         s = "class #{@name}_env extends uvm_env;\n\n"
-        s += "  int num_masters;\n"
+        s += "  // Virtual interface variable\n"
+        s += "  protected virtual interface #{@name}_if vif;\n\n"
+        s += "  // Control properties\n"
+		s += "  protected int num_masters = 0;\n\n"
+        s += "  // Components of the env\n"
         s += "  #{@name}_agent masters[];\n\n"
         s += "  `uvm_component_utils_begin(#{@name}_env)\n"
         s += "    `uvm_field_int(num_masters, UVM_ALL_ON)\n"
@@ -306,8 +320,13 @@ class UVM_gen_env < UVM_gen_file
         s += "  virtual function void build_phase(uvm_phase phase);\n"
         s += "    string inst_name;\n"
         s += "    super.build_phase(phase);\n\n"
+        s += "    if(!uvm_config_db#(virtual #{@name}_if)::get(this, \"\", \"vif\", vif))\n"
+        s += "      `uvm_fatal(\"NOVIF\",{\"virtual interface must be set for: \",get_full_name(),\".vif\"});\n\n"
         s += "    if(num_masters ==0)\n"
-        s += "      `uvm_fatal(\"NONUM\",{\"'num_masters' must be set for\", get_full_name()});\n\n"
+        s += "      `uvm_fatal(\"NONUM\",{\"'num_masters' must be set for: \", get_full_name()});\n\n"
+		s += "    //uvm_config_db#(uvm_active_passive_enum)::set(this,\n"
+		s += "    uvm_config_db#(int)::set(this,\n"
+		s += "      \"masters*\", \"is_active\", UVM_ACTIVE);\n\n"
         s += "    masters = new[num_masters];\n"
         s += "    for(int i = 0; i < num_masters; i++) begin\n"
         s += "      $sformat(inst_name, \"masters[%0d]\", i);\n"
@@ -324,6 +343,138 @@ class UVM_gen_env < UVM_gen_file
     
 end
 
+# UVM generator - test class
+# This class is used to generate test
+class UVM_gen_test < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = "class #{@name}_base_test extends uvm_test;\n\n"
+		s += "  `uvm_component_utils(#{@name}_base_test)\n\n"
+        s += "  #{@name}_env #{@name}_env0;\n\n"
+        s += "  // The test’s constructor\n"
+        s += "  function new (string name = \"#{@name}_base_test\",\n"
+        s += "    uvm_component parent = null);\n"
+        s += "    super.new(name, parent);\n"
+        s += "  endfunction\n\n"
+        s += "  // Update this component's properties and create the #{@name}_env component\n"
+        s += "  virtual function void build_phase(uvm_phase phase); // create the top-level environment.\n\n"
+		s += "    //For derived class, super.build_phase() through the base class,\n"
+		s += "    // will create the top-level environment and all its subcomponents\n"
+		s += "    //Therefore, any configuration that will affect the building\n"
+		s += "    // of these components must be set before calling super.build_phase()\n"
+        s += "    uvm_config_db#(int)::set(this,\"#{@name}_env0\", \"num_masters\", 1);\n"
+        s += "    super.build_phase(phase);\n"
+        s += "    #{@name}_env0 =\n"
+        s += "      #{@name}_env::type_id::create(\"#{@name}_env0\", this);\n"
+        s += "    //Since the sequences don’t get started until a later phase,\n"
+        s += "    // they could be called after super.build_phase()\n"
+        s += "    uvm_config_db#(uvm_object_wrapper)::\n"
+        s += "      set(this, \"#{@name}_env0.masters[0].sequencer.main_phase\",\n"
+        s += "      \"default_sequence\", #{@name}_base_seq::type_id::get());\n"
+        s += "  endfunction\n\n"
+        s += "  function void end_of_elaboration_phase(uvm_phase phase);\n"
+        s += "    uvm_top.print_topology();\n"
+        s += "  endfunction: end_of_elaboration_phase\n\n"
+		s += "  virtual task run_phase(uvm_phase phase);\n"
+        s += "    //set a drain-time for the environment if desired \n"
+        s += "    phase.phase_done.set_drain_time(this, 50);\n"
+        s += "  endtask\n\n"
+        s += "endclass\n"
+
+    end
+    
+end
+
+# UVM generator - sequence class
+# This class is used to generate sequence
+class UVM_gen_seq < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = "class #{@name}_base_seq extends uvm_sequence #(#{@name}_item);\n\n"
+		s += "  rand int count;\n"
+        s += "  constraint c1 { count > 0; count < 10; }\n\n"
+        s += "  // Register with the factory\n"
+        s += "  `uvm_object_utils( #{@name}_base_seq)\n\n"
+        s += "  // The sequence’s constructor\n"
+        s += "  function new (string name = \"#{@name}_base_seq\");\n"
+        s += "    super.new(name);\n"
+        s += "  endfunction\n\n"
+		s += "  virtual task body();\n"
+        s += "    repeat (count)\n"
+        s += "      `uvm_do(req)\n"
+        s += "  endtask\n\n"
+        s += "  virtual task pre_body();\n"
+        s += "    uvm_test_done.raise_objection(this);\n"
+        s += "  endtask\n\n"
+        s += "  virtual task post_body();\n"
+        s += "    uvm_test_done.drop_objection(this);\n"
+        s += "  endtask\n\n"
+        s += "endclass\n"
+
+    end
+    
+end
+
+
+# UVM generator - tb top class
+# This class is used to generate tb top module
+class UVM_gen_tb_top < UVM_gen_file
+
+	attr_reader :p_list, :dut_file, :dut_mod
+
+    def initialize(name, file, port_list, dut_file, dut_mod)
+        super(name, file)
+		@p_list = port_list
+		@dut_file = dut_file
+		@dut_mod = dut_mod
+    end
+    
+    def to_s
+        s = "`include \"#{@name}_pkg.sv\"\n"
+        s += "`include \"#{@dut_file}\"\n"
+        s += "`include \"#{@name}_if.sv\"\n\n"
+        s += "module #{@name}_tb_top;\n\n"
+        s += "  import uvm_pkg::*;\n"
+        s += "  import #{@name}_pkg::*;\n\n"
+        s += "  #{@name}_if vif(); //SystemVerilog Interface\n\n"
+        s += "  #{@dut_mod} dut(\n"
+
+        @p_list.each do |p|
+			s += "    vif.#{p.name}"
+			# Add comma if not the last port
+			s += "," if p != @p_list.last
+		    s += "\n"
+        end
+
+        s += "  );\n\n"
+        s += "  initial begin\n"
+		s += "    //automatic uvm_coreservice_t cs_ = uvm_coreservice_t::get();\n"
+        s += "    //uvm_config_db#(virtual #{@name}_if)::set(cs_.get_root(), \"*\", \"vif\", vif);\n"
+		s += "    uvm_config_db#(virtual #{@name}_if)::set(null, \"*.#{@name}_env0*\", \"vif\", vif);\n"
+        s += "    run_test();\n"
+        s += "  end\n\n"
+        s += "  initial begin\n"
+        s += "    //vif.sig_reset <= 1'b1;\n"
+        s += "    //vif.sig_clock <= 1'b1;\n"
+        s += "    //#50 vif.sig_reset = 1'b0;\n"
+        s += "  end\n\n"
+        s += "  //Generate Clock\n"
+        s += "  //always\n"
+        s += "  //  #5 vif.sig_clock = ~vif.sig_clock;\n\n"
+        s += "endmodule\n"
+    end
+    
+end
+
+
 # UVM generator - pkg class
 # This class is used to generate pkg
 class UVM_gen_pkg < UVM_gen_file
@@ -337,15 +488,30 @@ class UVM_gen_pkg < UVM_gen_file
         s += "  import uvm_pkg::*;\n"
         s += "  `include \"uvm_macros.svh\"\n\n"
         s += "  `include \"#{@name}_item.sv\"\n"
-        s += "  `include \"#{@name}_driver.sv\"\n"
-        s += "  `include \"#{@name}_monitor.sv\"\n"
+        s += "  `include \"#{@name}_drv.sv\"\n"
+        s += "  `include \"#{@name}_mon.sv\"\n"
         s += "  `include \"#{@name}_agent.sv\"\n"
         s += "  `include \"#{@name}_env.sv\"\n\n"
+        s += "  `include \"#{@name}_seq_lib.sv\"\n\n"
+        s += "  `include \"#{@name}_test_lib.sv\"\n\n"
         s += "endpackage: #{@name}_pkg\n"
     end
     
 end
 
+# UVM generator - sim cmd class
+# This class is used to generate simulation command
+class UVM_gen_sim_cmd < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = "irun -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush +define+FSDB -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue -timescale 1ns/10ps #{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=calib_common_base_test"
+    end
+    
+end
 
 # Only run the following code when this file is the main file being run
 # instead of having been required or loaded by another file
@@ -496,11 +662,11 @@ if __FILE__ == $0
 	item.to_f
     
     # Gen the driver
-    driver = UVM_gen_drv.new(env_name, out_dir+"/"+env_name+"_driver.sv")
+    driver = UVM_gen_drv.new(env_name, out_dir+"/"+env_name+"_drv.sv")
 	driver.to_f
 
 	# Gen the monitor
-    monitor = UVM_gen_mon.new(env_name, out_dir+"/"+env_name+"_monitor.sv")
+    monitor = UVM_gen_mon.new(env_name, out_dir+"/"+env_name+"_mon.sv")
 	monitor.to_f
     
     # Gen the sequencer
@@ -515,7 +681,24 @@ if __FILE__ == $0
     env = UVM_gen_env.new(env_name, out_dir+"/"+env_name+"_env.sv")
 	env.to_f
     
+    # Gen the test lib
+    test = UVM_gen_test.new(env_name, out_dir+"/"+env_name+"_test_lib.sv")
+	test.to_f
+
+    # Gen the seq lib
+    seq = UVM_gen_seq.new(env_name, out_dir+"/"+env_name+"_seq_lib.sv")
+	seq.to_f
+
+    # Gen the tb top
+    tb_top = UVM_gen_tb_top.new(env_name, out_dir+"/"+env_name+"_tb_top.sv", port_list, options[:mod_file], top_mod)
+	tb_top.to_f
+
     # Gen the pkg
     pkg = UVM_gen_pkg.new(env_name, out_dir+"/"+env_name+"_pkg.sv")
 	pkg.to_f
+
+    # Gen the cmd
+    sim_cmd = UVM_gen_sim_cmd.new(env_name, out_dir+"/"+"sim_cmd")
+	sim_cmd.to_f
+
 end
