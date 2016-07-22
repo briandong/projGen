@@ -223,10 +223,10 @@ class UVM_gen_mon < UVM_gen_file
         s += "  endtask: collect_transactions\n\n"
 		s += "  virtual protected function void perform_transfer_coverage();\n"
         s += "    -> cov_transaction;\n"
-        s += "  endfunction : perform_transfer_coverage\n\n"
+        s += "  endfunction: perform_transfer_coverage\n\n"
         s += "  virtual protected function void perform_transfer_checks();\n"
         s += "    // Perform data checks on trans_collected.\n"
-        s += "  endfunction : perform_transfer_checks\n\n"
+        s += "  endfunction: perform_transfer_checks\n\n"
         s += "endclass: #{@name}_monitor\n"
         
     end
@@ -298,6 +298,40 @@ class UVM_gen_agent < UVM_gen_file
     
 end
 
+# UVM generator - scoreboard class
+# This class is used to generate a scoreboard
+class UVM_gen_sb < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = "class #{@name}_scoreboard extends uvm_scoreboard;\n\n"
+        s += "  uvm_analysis_imp#(#{@name}_item, #{@name}_scoreboard) item_collected_export;\n\n"
+        s += "  protected bit disable_scoreboard = 0;\n"
+        s += "  int sb_error = 0;\n\n"
+        s += "  // Provide implementations of virtual methods such as get_type_name and create\n"
+        s += "  `uvm_component_utils_begin(#{@name}_scoreboard)\n"
+        s += "    `uvm_field_int(disable_scoreboard, UVM_ALL_ON)\n"
+        s += "  `uvm_component_utils_end\n\n"
+        s += "  // Constructor\n"
+        s += "  function new (string name, uvm_component parent);\n"
+        s += "    super.new(name, parent);\n"
+        s += "  endfunction: new\n\n"
+        s += "  // build_phase\n"
+        s += "  function void build_phase(uvm_phase phase);\n"
+        s += "    item_collected_export = new(\"item_collected_export\", this);\n"
+        s += "  endfunction\n\n"
+        s += "  // Provide implementation of write()\n"
+        s += "  virtual function void write(#{@name}_item trans);\n"
+        s += "    if(!disable_scoreboard) begin\n"
+        s += "	  end\n"
+        s += "  endfunction: write\n\n"
+        s += "endclass\n"
+    end
+end
+
 # UVM generator - env class
 # This class is used to generate env
 class UVM_gen_env < UVM_gen_file
@@ -313,7 +347,8 @@ class UVM_gen_env < UVM_gen_file
         s += "  // Control properties\n"
 		s += "  protected int num_masters = 0;\n\n"
         s += "  // Components of the env\n"
-        s += "  #{@name}_agent masters[];\n\n"
+        s += "  #{@name}_agent masters[];\n"
+		s += "  #{@name}_scoreboard scoreboard0;\n\n"
         s += "  `uvm_component_utils_begin(#{@name}_env)\n"
         s += "    `uvm_field_int(num_masters, UVM_ALL_ON)\n"
         s += "  `uvm_component_utils_end\n\n"
@@ -332,8 +367,14 @@ class UVM_gen_env < UVM_gen_file
         s += "      $sformat(inst_name, \"masters[%0d]\", i);\n"
         s += "      masters[i] = #{@name}_agent::type_id::create(inst_name, this);\n"
         s += "    end\n\n"
+		s += "    scoreboard0 = #{@name}_scoreboard::type_id::create(\"scoreboard0\", this);\n\n"
         s += "    // Build slaves and other components\n\n"
         s += "  endfunction\n\n"
+        s += "  virtual function void connect_phase(uvm_phase phase);\n"
+        s += "    // Connect monitor to scoreboard\n"
+        s += "    masters[0].monitor.item_collected_port.connect(\n"
+        s += "      scoreboard0.item_collected_export);\n"
+        s += "  endfunction: connect_phase\n\n"
         s += "  // Constructor\n"
         s += "  function new(string name, uvm_component parent);\n"
         s += "    super.new(name, parent);\n"
@@ -373,7 +414,7 @@ class UVM_gen_test < UVM_gen_file
         s += "    //Since the sequences don’t get started until a later phase,\n"
         s += "    // they could be called after super.build_phase()\n"
         s += "    uvm_config_db#(uvm_object_wrapper)::\n"
-        s += "      set(this, \"#{@name}_env0.masters[0].sequencer.main_phase\",\n"
+        s += "      set(this, \"#{@name}_env0.masters[0].sequencer.run_phase\",\n"
         s += "      \"default_sequence\", #{@name}_base_seq::type_id::get());\n"
         s += "  endfunction\n\n"
         s += "  function void end_of_elaboration_phase(uvm_phase phase);\n"
@@ -381,7 +422,7 @@ class UVM_gen_test < UVM_gen_file
         s += "  endfunction: end_of_elaboration_phase\n\n"
 		s += "  virtual task run_phase(uvm_phase phase);\n"
         s += "    //set a drain-time for the environment if desired \n"
-        s += "    phase.phase_done.set_drain_time(this, 50);\n"
+        s += "    phase.phase_done.set_drain_time(this, 5000);\n"
         s += "  endtask\n\n"
         s += "endclass\n"
 
@@ -402,12 +443,13 @@ class UVM_gen_seq < UVM_gen_file
 		s += "  rand int count;\n"
         s += "  constraint c1 { count > 0; count < 10; }\n\n"
         s += "  // Register with the factory\n"
-        s += "  `uvm_object_utils( #{@name}_base_seq)\n\n"
+        s += "  `uvm_object_utils(#{@name}_base_seq)\n\n"
         s += "  // The sequence’s constructor\n"
         s += "  function new (string name = \"#{@name}_base_seq\");\n"
         s += "    super.new(name);\n"
         s += "  endfunction\n\n"
 		s += "  virtual task body();\n"
+		s += "    `uvm_info(get_type_name(), $psprintf(\"has %0d item(s)\", count), UVM_LOW)\n"
         s += "    repeat (count)\n"
         s += "      `uvm_do(req)\n"
         s += "  endtask\n\n"
@@ -491,6 +533,7 @@ class UVM_gen_pkg < UVM_gen_file
         s += "  `include \"#{@name}_drv.sv\"\n"
         s += "  `include \"#{@name}_mon.sv\"\n"
         s += "  `include \"#{@name}_agent.sv\"\n"
+        s += "  `include \"#{@name}_scoreboard.sv\"\n\n"
         s += "  `include \"#{@name}_env.sv\"\n\n"
         s += "  `include \"#{@name}_seq_lib.sv\"\n\n"
         s += "  `include \"#{@name}_test_lib.sv\"\n\n"
@@ -677,6 +720,10 @@ if __FILE__ == $0
     agent = UVM_gen_agent.new(env_name, out_dir+"/"+env_name+"_agent.sv")
 	agent.to_f
     
+	# Gen the scoreboard
+    scoreboard = UVM_gen_sb.new(env_name, out_dir+"/"+env_name+"_scoreboard.sv")
+	scoreboard.to_f
+
     # Gen the env
     env = UVM_gen_env.new(env_name, out_dir+"/"+env_name+"_env.sv")
 	env.to_f
