@@ -511,6 +511,14 @@ class UVM_gen_tb_top < UVM_gen_file
         s += "  //Generate Clock\n"
         s += "  //always\n"
         s += "  //  #5 vif.sig_clock = ~vif.sig_clock;\n\n"
+        s += "  //dump fsdb\n"
+        s += "  `ifdef FSDB\n"
+        s += "  initial begin\n"
+        s += " 	  $fsdbDumpfile(\"wave.fsdb\");\n"
+        s += "    $fsdbDumpvars(0, #{@name}_tb_top);\n"
+        s += "    $fsdbDumpflush;\n"
+        s += "  end\n"
+        s += "  `endif\n\n"
         s += "endmodule\n"
     end
     
@@ -533,25 +541,31 @@ class UVM_gen_pkg < UVM_gen_file
         s += "  `include \"#{@name}_drv.sv\"\n"
         s += "  `include \"#{@name}_mon.sv\"\n"
         s += "  `include \"#{@name}_agent.sv\"\n"
-        s += "  `include \"#{@name}_scoreboard.sv\"\n\n"
-        s += "  `include \"#{@name}_env.sv\"\n\n"
-        s += "  `include \"#{@name}_seq_lib.sv\"\n\n"
-        s += "  `include \"#{@name}_test_lib.sv\"\n\n"
-        s += "endpackage: #{@name}_pkg\n"
+        s += "  `include \"#{@name}_scoreboard.sv\"\n"
+        s += "  `include \"#{@name}_env.sv\"\n"
+        s += "  `include \"#{@name}_seq_lib.sv\"\n"
+        s += "  `include \"#{@name}_test_lib.sv\"\n"
+        s += "endpackage: #{@name}_pkg\n\n"
     end
     
 end
 
-# UVM generator - sim cmd class
-# This class is used to generate simulation command
-class UVM_gen_sim_cmd < UVM_gen_file
+# UVM generator - makefile class
+# This class is used to generate makefile
+class UVM_gen_makefile < UVM_gen_file
 
     def initialize(name, file)
         super(name, file)
     end
     
     def to_s
-        s = "irun -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush +define+FSDB -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue -timescale 1ns/10ps #{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=calib_common_base_test"
+		s = "uvm_home = /home/nxf06757/data/lib/uvm-1.2\n\n"
+        s += "run:\n"
+		s += "\tirun -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush +define+FSDB -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue #{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=calib_common_base_test\n\n"
+		s += "run_fsdb:\n"
+		s += "\tirun -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush +define+FSDB -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue #{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=calib_common_base_test +define+FSDB\n\n"
+		s += "verdi:\n"
+		s += "\tverdi -sv +incdir+$(uvm_home)/src $(uvm_home)/src/uvm.sv #{@name}_tb_top.sv &"
     end
     
 end
@@ -744,8 +758,8 @@ if __FILE__ == $0
     pkg = UVM_gen_pkg.new(env_name, out_dir+"/"+env_name+"_pkg.sv")
 	pkg.to_f
 
-    # Gen the cmd
-    sim_cmd = UVM_gen_sim_cmd.new(env_name, out_dir+"/"+"sim_cmd")
-	sim_cmd.to_f
+    # Gen the makefile
+    makefile = UVM_gen_makefile.new(env_name, out_dir+"/"+"Makefile")
+	makefile.to_f
 
 end
