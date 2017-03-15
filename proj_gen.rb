@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'optparse'
+require 'fileutils'
 
 # UVM generator - base class
 # This is the base class for all UVM generator classes
@@ -490,8 +491,8 @@ class UVM_gen_tb_top < UVM_gen_file
     
     def to_s
         s = "`include \"#{@name}_pkg.sv\"\n"
-        s += "`include \"#{@dut_file}\"\n"
         s += "`include \"#{@name}_if.sv\"\n\n"
+        s += "`include \"#{@dut_file}\"\n\n"
         s += "module #{@name}_tb_top;\n\n"
         s += "  import uvm_pkg::*;\n"
         s += "  import #{@name}_pkg::*;\n\n"
@@ -559,22 +560,64 @@ class UVM_gen_pkg < UVM_gen_file
     
 end
 
-# UVM generator - makefile class
-# This class is used to generate makefile
-class UVM_gen_makefile < UVM_gen_file
+# UVM generator - rakefile class
+# This class is used to generate rakefile
+class UVM_gen_rakefile < UVM_gen_file
 
     def initialize(name, file)
         super(name, file)
     end
     
     def to_s
-		s = "uvm_home = /home/nxf06757/data/lib/uvm-1.2\n\n"
-        s += "run:\n"
-		s += "\tirun -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue #{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=#{@name}_base_test\n\n"
-		s += "run_fsdb:\n"
-		s += "\tirun -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue #{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=#{@name}_base_test +define+FSDB\n\n"
-		s += "verdi:\n"
-		s += "\tverdi -sv +incdir+$(uvm_home)/src $(uvm_home)/src/uvm.sv #{@name}_tb_top.sv &"
+
+		s =  "uvm_home = \"/home/nxf06757/data/lib/uvm-1.2\"\n\n"
+		s += "home_dir = Dir.pwd\n"
+        s += "out_dir = \"./out\"\n"
+        s += "src_dir = out_dir+\"/src\"\n"
+        s += "sim_dir = out_dir+\"/sim\"\n"
+        s += "ip_dir = out_dir+\"/ip\"\n\n"
+
+		s += "task :default => [:run]\n\n"
+
+        s += "desc \"make directories\"\n"
+        s += "task :mkdir do\n"
+		s += "\tmkdir_p src_dir\n"
+		s += "\tmkdir_p sim_dir\n"
+		s += "end\n\n"
+
+        s += "desc \"publishing files\"\n"
+        s += "task :publish => [:mkdir] do\n"
+		s += "\tcmd = \"ln -s \#{home_dir}/rtl \#{src_dir}\"\n"
+		s += "\tputs \"Running CMD> \#{cmd}\"\n"
+		s += "\tsystem(cmd)\n"
+		s += "\tcmd = \"ln -s \#{home_dir}/verif \#{src_dir}\"\n"
+		s += "\tputs \"Running CMD> \#{cmd}\"\n"
+		s += "\tsystem(cmd)\n"
+		s += "\tcmd = \"ln -s \#{home_dir}/ip \#{ip_dir}\"\n"
+		s += "\tputs \"Running CMD> \#{cmd}\"\n"
+		s += "\tsystem(cmd)\n"
+		s += "end\n\n"
+
+        s += "desc \"run base case\"\n"
+        s += "task :run => [:publish] do\n"
+		s += "\tcmd = \"cd \#{sim_dir}; irun +incdir+../src/verif/uvc/#{@name} +incdir+../src/rtl -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue ../src/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=#{@name}_base_test\"\n"
+		s += "\tputs \"Running CMD> \#{cmd}\"\n"
+		s += "\tsystem(cmd)\n"
+		s += "end\n\n"
+
+        s += "desc \"run base case with waveform\"\n"
+		s += "task :run_fsdb => [:publish] do\n"
+		s += "\tcmd = \"cd \#{sim_dir}; irun +incdir+../src/verif/uvc/#{@name} +incdir+../src/rtl -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue ../src/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=#{@name}_base_test +define+FSDB\"\n"
+		s += "\tputs \"Running CMD> \#{cmd}\"\n"
+		s += "\tsystem(cmd)\n"
+		s += "end\n\n"
+
+        s += "desc \"open verdi\"\n"
+		s += "task :verdi => [:run_fsdb] do\n"
+		s += "\tcmd = \"cd \#{sim_dir}; verdi -sv +incdir+\#{uvm_home}/src \#{uvm_home}/src/uvm.sv ../src/verif/tb/#{@name}_tb_top.sv &\"\n"
+		s += "\tputs \"Running CMD> \#{cmd}\"\n"
+		s += "\tsystem(cmd)\n"
+		s += "end\n\n"
     end
     
 end
@@ -589,7 +632,7 @@ if __FILE__ == $0
 
     optparse = OptionParser.new do |opts|
         # Set a banner displayed at the top of the help screen
-        opts.banner = "Usage: ./uvm_gen.rb -n ENV_NAME -f MODULE_FILE [-t TOP_MODULE] -o OUTPUT_DIR"
+        opts.banner = "Usage: ./proj_gen.rb -n ENV_NAME -f MODULE_FILE [-t TOP_MODULE] -o OUTPUT_DIR"
     
         # Define the env name
         options[:env_name] = nil
@@ -689,9 +732,8 @@ if __FILE__ == $0
     # Assign options hash to variables
     env_name = options[:env_name]
     mod_file = options[:mod_file]
-    out_dir  = options[:output_dir]
+	out_dir  = options[:output_dir].chomp.strip
     out_dir.chop! if out_dir[-1] == '/'
-    
     
     # Check the ports
     port_list = []
@@ -718,57 +760,75 @@ if __FILE__ == $0
     
     mod_file.close   
     
-    
+	puts "making dir: #{out_dir}"
+
+	# Copy RTL file
+	Dir.mkdir out_dir+"/rtl" if !File::directory?(out_dir+"/rtl")
+	FileUtils.copy options[:mod_file], out_dir+"/rtl"
+	puts "Copying RTL file to: #{out_dir}/rtl"
+	
+	# Gen UVC files
+	Dir.mkdir out_dir+"/verif" if !File::directory?(out_dir+"/verif")
+	Dir.mkdir out_dir+"/verif/uvc" if !File::directory?(out_dir+"/verif/uvc")
+	Dir.mkdir out_dir+"/verif/uvc/"+env_name if !File::directory?(out_dir+"/verif/uvc/"+env_name)
     # Gen the interface
-    intf = UVM_gen_if.new(env_name, out_dir+"/"+env_name+"_if.sv", port_list)
+    intf = UVM_gen_if.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_if.sv", port_list)
     intf.to_f
     
     # Gen the data item
-    item = UVM_gen_item.new(env_name, out_dir+"/"+env_name+"_item.sv")
+    item = UVM_gen_item.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_item.sv")
 	item.to_f
     
     # Gen the driver
-    driver = UVM_gen_drv.new(env_name, out_dir+"/"+env_name+"_drv.sv")
+    driver = UVM_gen_drv.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_drv.sv")
 	driver.to_f
 
 	# Gen the monitor
-    monitor = UVM_gen_mon.new(env_name, out_dir+"/"+env_name+"_mon.sv")
+    monitor = UVM_gen_mon.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_mon.sv")
 	monitor.to_f
     
     # Gen the sequencer
-    #sequencer = UVM_gen_seqr.new(env_name, out_dir+"/"+env_name+"_sequencer.sv")
+    #sequencer = UVM_gen_seqr.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_sequencer.sv")
 	#sequencer.to_f
     
     # Gen the agent
-    agent = UVM_gen_agent.new(env_name, out_dir+"/"+env_name+"_agent.sv")
+    agent = UVM_gen_agent.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_agent.sv")
 	agent.to_f
     
 	# Gen the scoreboard
-    scoreboard = UVM_gen_sb.new(env_name, out_dir+"/"+env_name+"_scoreboard.sv")
+    scoreboard = UVM_gen_sb.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_scoreboard.sv")
 	scoreboard.to_f
 
     # Gen the env
-    env = UVM_gen_env.new(env_name, out_dir+"/"+env_name+"_env.sv")
+    env = UVM_gen_env.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_env.sv")
 	env.to_f
     
     # Gen the test lib
-    test = UVM_gen_test.new(env_name, out_dir+"/"+env_name+"_test_lib.sv")
+    test = UVM_gen_test.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_test_lib.sv")
 	test.to_f
 
     # Gen the seq lib
-    seq = UVM_gen_seq.new(env_name, out_dir+"/"+env_name+"_seq_lib.sv")
+    seq = UVM_gen_seq.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_seq_lib.sv")
 	seq.to_f
 
-    # Gen the tb top
-    tb_top = UVM_gen_tb_top.new(env_name, out_dir+"/"+env_name+"_tb_top.sv", port_list, options[:mod_file], top_mod)
-	tb_top.to_f
-
     # Gen the pkg
-    pkg = UVM_gen_pkg.new(env_name, out_dir+"/"+env_name+"_pkg.sv")
+    pkg = UVM_gen_pkg.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_pkg.sv")
 	pkg.to_f
 
-    # Gen the makefile
-    makefile = UVM_gen_makefile.new(env_name, out_dir+"/"+"Makefile")
-	makefile.to_f
+
+	# Gen tb files
+	Dir.mkdir out_dir+"/verif/tb" if !File::directory?(out_dir+"/verif/tb")
+
+    # Gen the tb top
+	dut_file = options[:mod_file].split('/')[-1]
+    tb_top = UVM_gen_tb_top.new(env_name, out_dir+"/verif/tb/"+env_name+"_tb_top.sv", port_list, dut_file, top_mod)
+	tb_top.to_f
+
+	# IP dir
+	Dir.mkdir out_dir+"/ip" if !File::directory?(out_dir+"/ip")
+
+    # Gen the rakefile
+    rakefile = UVM_gen_rakefile.new(env_name, out_dir+"/rakefile")
+	rakefile.to_f
 
 end
