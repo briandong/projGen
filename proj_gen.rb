@@ -632,11 +632,11 @@ if __FILE__ == $0
 
     optparse = OptionParser.new do |opts|
         # Set a banner displayed at the top of the help screen
-        opts.banner = "Usage: ./proj_gen.rb -n ENV_NAME -f MODULE_FILE [-t TOP_MODULE] -o OUTPUT_DIR"
+        opts.banner = "Usage: ./proj_gen.rb -n PROJ_NAME -f MODULE_FILE [-t TOP_MODULE] -o OUTPUT_DIR"
     
         # Define the env name
         options[:env_name] = nil
-        opts.on('-n', '--name ENV_NAME', 'Specify the environment name') do |name|
+        opts.on('-n', '--name PROJ_NAME', 'Specify the project name') do |name|
             options[:env_name] = name
         end
  
