@@ -23,17 +23,19 @@ Note: [-t TOP_MODULE] is optional, default is the 1st module in MODULE_FILE
 
 ### Examples
 
-Specify project name "uart", RTL file "sample.v", top module "sample", and generate to dir "./uart":
-> ./proj_gen.rb -n uart -f sample.v -t sample-o ./uart
+Specify project name "sample", RTL file "sample.v", top module "sample", and generate to dir "./sample":
+> ./proj_gen.rb -n sample -f sample.v -t sample-o ./sample
 
 Could omit top module if "sample" is the 1st module defined in RTL file "sample.v":
-> ./proj_gen.rb -n uart -f sample.v -o ./uart
+> ./proj_gen.rb -n sample -f sample.v -o ./sample
 
-## Exploring the Generated Project
+## Exploring the Sample Project
 
-In this section we explore the generated project.
+In this section we explore the generated sample project.
 
 ### File Structure
+
+
 
 
 
