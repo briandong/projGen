@@ -570,13 +570,20 @@ class UVM_gen_rakefile < UVM_gen_file
     
     def to_s
 
-		s =  "uvm_home = \"/home/nxf06757/data/lib/uvm-1.2\"\n\n"
-		s += "home_dir = Dir.pwd\n"
-        s += "out_dir = home_dir+\"/out\"\n"
-        s += "src_dir = out_dir+\"/src\"\n"
-        s += "sim_dir = out_dir+\"/sim\"\n"
-		s += "comp_dir = out_dir+\"/comp\"\n"
-        s += "ip_dir = out_dir+\"/ip\"\n\n"
+		s = "home_dir = Dir.pwd\n"
+        s += "out_dir  = home_dir+\"/out\"\n"
+        s += "src_dir  = out_dir+\"/src\"\n"
+        s += "ip_dir   = src_dir+\"/ip\"\n"
+        s += "rtl_dir  = src_dir+\"/rtl\"\n"
+        s += "ver_dir  = src_dir+\"/verif\"\n"
+        s += "sim_dir  = out_dir+\"/sim\"\n"
+		s += "comp_dir = sim_dir+\"/comp\"\n\n"
+
+		s += "incdir_list = \"+incdir+\#{rtl_dir} +incdir+\#{ver_dir}/tb +incdir+\#{ver_dir}/uvc/#{@name}\"\n\n"
+
+		s += "compile_cmd = \"irun -elaborate \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv	-top #{@name}_tb_top -64bit -access +rw -uvm -v93 +define+FSDB -l irun_comp_#{@name}.log\"\n\n"
+
+		s += "sim_cmd = \"irun -R -nclibdirname \#{comp_dir}/INCA_libs \#{incdir_list} -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue \#{src_dir}/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH\"\n\n"
 
 		s += "task :default => [:run]\n\n"
 
@@ -596,8 +603,7 @@ class UVM_gen_rakefile < UVM_gen_file
 		s += "\tcmd = \"ln -s \#{home_dir}/verif \#{src_dir}\"\n"
 		s += "\tputs \"Running CMD> \#{cmd}\"\n"
 		s += "\tsystem(cmd)\n"
-		s += "\tmkdir_p ip_dir\n"
-		s += "\tcmd = \"ln -s \#{home_dir}/ip \#{ip_dir}\"\n"
+		s += "\tcmd = \"ln -s \#{home_dir}/ip \#{src_dir}\"\n"
 		s += "\tputs \"Running CMD> \#{cmd}\"\n"
 		s += "\tsystem(cmd)\n"
 		s += "end\n\n"
@@ -605,29 +611,35 @@ class UVM_gen_rakefile < UVM_gen_file
 		s += "desc \"compile\"\n"
         s += "task :compile => [:publish] do\n"
 		s += "\tmkdir_p comp_dir\n"
-		s += "\tcmd = \"cd \#{comp_dir}; irun +incdir+../src/verif/uvc/#{@name} +incdir+../src/rtl -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue ../src/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=#{@name}_base_test\"\n"
+		s += "\tcmd = \"cd \#{comp_dir}; \#{compile_cmd}\"\n"
 		s += "\tputs \"Running CMD> \#{cmd}\"\n"
 		s += "\tsystem(cmd)\n"
 		s += "end\n\n"
 		
-        s += "desc \"run base case\"\n"
-        s += "task :run => [:compile] do\n"
-		s += "\tmkdir_p sim_dir\n"
-		s += "\tcmd = \"cd \#{sim_dir}; irun -R -nclibdirname ../INCA_libs +incdir+../src/verif/uvc/#{@name} +incdir+../src/rtl -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue ../src/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=#{@name}_base_test\"\n"
+        s += "desc \"run case\"\n"
+        s += "task :run, [:case] => [:compile] do |t, args|\n"
+		s += "\targs.with_defaults(:case => '#{@name}_base_test')\n"
+		s += "\tcase_dir = sim_dir+\"/\#{args[:case]}\"\n"
+		s += "\tmkdir_p case_dir\n"
+		s += "\tcmd = \"cd \#{case_dir}; \#{sim_cmd} +UVM_TESTNAME=\#{args[:case]}\"\n"
 		s += "\tputs \"Running CMD> \#{cmd}\"\n"
 		s += "\tsystem(cmd)\n"
 		s += "end\n\n"
 
-        s += "desc \"run base case with waveform\"\n"
-		s += "task :run_fsdb => [:compile] do\n"
-		s += "\tcmd = \"cd \#{sim_dir}; irun -R -nclibdirname ../INCA_libs +incdir+../src/verif/uvc/#{@name} +incdir+../src/rtl -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue ../src/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH +UVM_TESTNAME=#{@name}_base_test +define+FSDB\"\n"
+        s += "desc \"run case with waveform\"\n"
+		s += "task :run_fsdb, [:case] => [:compile] do |t, args|\n"
+		s += "\targs.with_defaults(:case => '#{@name}_base_test')\n"
+		s += "\tcase_dir = sim_dir+\"/\#{args[:case]}\"\n"
+		s += "\tmkdir_p case_dir\n"
+		s += "\tcmd = \"cd \#{case_dir}; \#{sim_cmd} +UVM_TESTNAME=\#{args[:case]} +define+FSDB\"\n"
 		s += "\tputs \"Running CMD> \#{cmd}\"\n"
 		s += "\tsystem(cmd)\n"
 		s += "end\n\n"
 
         s += "desc \"open verdi\"\n"
-		s += "task :verdi => [:run_fsdb] do\n"
-		s += "\tcmd = \"cd \#{sim_dir}; verdi -sv +incdir+\#{uvm_home}/src \#{uvm_home}/src/uvm.sv ../src/verif/tb/#{@name}_tb_top.sv &\"\n"
+		s += "task :verdi do\n"
+		s += "\tmkdir_p sim_dir\n"
+		s += "\tcmd = \"cd \#{sim_dir}; verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv &\"\n"
 		s += "\tputs \"Running CMD> \#{cmd}\"\n"
 		s += "\tsystem(cmd)\n"
 		s += "end\n\n"
@@ -774,6 +786,7 @@ if __FILE__ == $0
     mod_file.close   
     
 	puts "making dir: #{out_dir}"
+	Dir.mkdir out_dir if !File::directory?(out_dir)
 
 	# Copy RTL file
 	Dir.mkdir out_dir+"/rtl" if !File::directory?(out_dir+"/rtl")
