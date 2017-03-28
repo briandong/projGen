@@ -31,6 +31,8 @@ Could omit top module if "sample" is the 1st module defined in RTL file "sample.
 
 
 
+------
+
 ## Exploring the Sample Project
 
 In this section we explore the generated sample project.
@@ -52,7 +54,13 @@ rake run_fsdb[case]  # run case with waveform
 rake verdi           # open verdi
 ```
 
-*In this sample project, IPs are developed separately and organized as nested submodules.*
+Pay attention to task
+
+> rake ip
+
+IPs are developed as separate projects and organized as nested submodules in this sample project.
+
+**Benefit:** a centralized IP is much easier to maintain than the the same IP scattered in different projects with different versions.
 
 ### Dependency
 
@@ -62,13 +70,15 @@ Note that the tasks above have dependency relationship as:
 ip <= publish <= compile <= run/run_fsdb
 ```
 
-*It means higher dependency tasks (right ones) rely on lower dependency tasks (left ones), and will automatically execute dependent tasks if necessary.*
+It means higher dependency tasks (right ones) rely on lower dependency tasks (left ones), and will automatically execute dependent tasks if necessary.
 
 For example, if you execute
 
 > rake run
 
 from scratch, it will automatically run tasks 'ip', 'publish', and 'compile' before that.
+
+**Benefit:** program takes care of all the underlying dependency issues so that user only needs to focus on target task.
 
 ### Flow and File Structure
 
@@ -98,7 +108,7 @@ Before running any tasks, the original clean project file structure is:
 
 #### Publish
 
-For better flexibility and neater source code control, all the code is published to 'out/src' directory before use (compile/run). So the project file structure after 
+All the code is published to 'out/src' directory before use (compile/run). So the project file structure after 
 
 > rake publish
 
@@ -115,6 +125,8 @@ is:
 ▸ verif/
   rakefile
 ```
+
+**Benefit:** better flexibility and neater source code control.
 
 #### Compile
 
@@ -164,17 +176,13 @@ for case simulation w.o/w. waveform. The sim log and waveform are stored in dire
   rakefile
 ```
 
-*Note that multiple cases can run simultaneously based on the same snapshot to improve the simulation efficiency.*
+**Benefit:** multiple cases can run simultaneously based on the same snapshot to improve the simulation efficiency.
 
 #### Debug
 
-To open a verdi session, just type:
+To open a verdi session for debug, just type:
 
 > rake verdi
-
-
-
-
 
 
 
