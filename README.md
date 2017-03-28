@@ -52,7 +52,7 @@ rake run_fsdb[case]  # run case with waveform
 rake verdi           # open verdi
 ```
 
-Note that IPs are organized as submodules in this sample, so we should run 'rake ip' before executing other tasks.
+*In this sample project, IPs are developed separately and organized as nested submodules.*
 
 ### Dependency
 
@@ -62,7 +62,7 @@ Note that the tasks above have dependency relationship as:
 ip <= publish <= compile <= run/run_fsdb
 ```
 
-It means higher dependency tasks (right ones) rely on lower dependency tasks (left ones), and will automatically execute dependent tasks if necessary.
+*It means higher dependency tasks (right ones) rely on lower dependency tasks (left ones), and will automatically execute dependent tasks if necessary.*
 
 For example, if you execute
 
@@ -164,9 +164,11 @@ for case simulation w.o/w. waveform. The sim log and waveform are stored in dire
   rakefile
 ```
 
+*Note that multiple cases can run simultaneously based on the same snapshot to improve the simulation efficiency.*
+
 #### Debug
 
-To open a verdi session, type:
+To open a verdi session, just type:
 
 > rake verdi
 
