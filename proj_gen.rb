@@ -588,7 +588,7 @@ class UVM_gen_rakefile < UVM_gen_file
 	        s += "compile_cmd = cmd_prefix + \"vcs \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -sverilog -l compile.log\"\n"
 
 		s += "#sim_cmd = \"irun -R -nclibdirname \#{comp_dir}/INCA_libs \#{incdir_list} -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue \#{src_dir}/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH\"\n\n"
-	        s += "sim_cmd = cmd_prefix + \"../comp/simv +ntb_random_seed_automatic +UVM_VERBOSITY=UVM_HIGH -l sim.log\"\n\n"
+	        s += "sim_cmd = cmd_prefix + \"../comp/simv +ntb_random_seed_automatic +UVM_CONFIG_DB_TRACE +UVM_VERBOSITY=UVM_HIGH -l sim.log\"\n\n"
 
 		s += "task :default => [:run]\n\n"
 
