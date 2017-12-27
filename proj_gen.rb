@@ -524,7 +524,7 @@ class UVM_gen_tb_top < UVM_gen_file
         s += "  //dump fsdb\n"
         s += "  `ifdef FSDB\n"
         s += "  initial begin\n"
-        s += " 	  $fsdbDumpfile(\"wave.fsdb\");\n"
+        s += " 	  $fsdbDumpfile(\"novas.fsdb\");\n"
         s += "    $fsdbDumpvars(0, #{@name}_tb_top);\n"
         s += "    $fsdbDumpflush;\n"
         s += "  end\n"
@@ -585,10 +585,12 @@ class UVM_gen_rakefile < UVM_gen_file
 	        s += "cmd_prefix = \"bsub -I \"\n\n"
 
 		s += "#compile_cmd = \"irun -elaborate \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -top #{@name}_tb_top -64bit -access +rw -uvm -v93 +define+FSDB -l irun_comp_#{@name}.log\"\n\n"
-	        s += "compile_cmd = cmd_prefix + \"vcs \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -sverilog -l compile.log\"\n"
+	        s += "compile_cmd = cmd_prefix + \"vcs \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -sverilog -full64 -debug_access+all -lca -l compile.log\"\n"
 
 		s += "#sim_cmd = \"irun -R -nclibdirname \#{comp_dir}/INCA_libs \#{incdir_list} -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue \#{src_dir}/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH\"\n\n"
-	        s += "sim_cmd = cmd_prefix + \"../comp/simv +ntb_random_seed_automatic +UVM_CONFIG_DB_TRACE +UVM_VERBOSITY=UVM_HIGH -l sim.log\"\n\n"
+	        s += "sim_cmd = cmd_prefix + \"../comp/simv +ntb_random_seed_automatic +UVM_VERBOSITY=UVM_HIGH -l sim.log\"\n\n"
+	    
+	        s += "verdi_cmd = cmd_prefix + \"verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv &\"\n\n"
 
 		s += "task :default => [:run]\n\n"
 
@@ -631,12 +633,20 @@ class UVM_gen_rakefile < UVM_gen_file
 		s += "\tsystem(cmd)\n"
 		s += "end\n\n"
 
-        s += "desc \"run case with waveform\"\n"
-		s += "task :run_fsdb, [:case] => [:compile] do |t, args|\n"
+	s += "desc \"compile with debug/waveform\"\n"
+        s += "task :compile_debug => [:publish] do\n"
+		s += "\tmkdir_p comp_dir\n"
+		s += "\tcmd = \"cd \#{comp_dir}; \#{compile_cmd} +define+FSDB\"\n"
+		s += "\tputs \"Running CMD> \#{cmd}\"\n"
+		s += "\tsystem(cmd)\n"
+		s += "end\n\n"
+	    
+        s += "desc \"run case with debug/waveform\"\n"
+		s += "task :run_debug, [:case] => [:compile_debug] do |t, args|\n"
 		s += "\targs.with_defaults(:case => '#{@name}_base_test')\n"
 		s += "\tcase_dir = sim_dir+\"/\#{args[:case]}\"\n"
 		s += "\tmkdir_p case_dir\n"
-		s += "\tcmd = \"cd \#{case_dir}; \#{sim_cmd} +UVM_TESTNAME=\#{args[:case]} +define+FSDB\"\n"
+		s += "\tcmd = \"cd \#{case_dir}; \#{sim_cmd} +UVM_TESTNAME=\#{args[:case]} +UVM_CONFIG_DB_TRACE\"\n"
 		s += "\tputs \"Running CMD> \#{cmd}\"\n"
 		s += "\tsystem(cmd)\n"
 		s += "end\n\n"
@@ -644,7 +654,7 @@ class UVM_gen_rakefile < UVM_gen_file
         s += "desc \"open verdi\"\n"
 		s += "task :verdi do\n"
 		s += "\tmkdir_p sim_dir\n"
-		s += "\tcmd = \"cd \#{sim_dir}; verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv &\"\n"
+		s += "\tcmd = \"cd \#{sim_dir}; \#{verdi_cmd}\"\n"
 		s += "\tputs \"Running CMD> \#{cmd}\"\n"
 		s += "\tsystem(cmd)\n"
 		s += "end\n\n"
