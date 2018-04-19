@@ -678,93 +678,82 @@ class UVM_gen_rakefile < UVM_gen_file
     def to_s
 		s = <<-HEREDOC_RAKE
 home_dir = Dir.pwd
-out_dir  = home_dir+\"/out\"
-src_dir  = out_dir+\"/src\"
-ip_dir   = src_dir+\"/ip\"
-rtl_dir  = src_dir+\"/rtl\"
-ver_dir  = src_dir+\"/verif\"
-sim_dir  = out_dir+\"/sim\"
-comp_dir = sim_dir+\"/comp\"
+out_dir  = home_dir+"/out"
+src_dir  = out_dir+"/src"
+ip_dir   = src_dir+"/ip"
+rtl_dir  = src_dir+"/rtl"
+ver_dir  = src_dir+"/verif"
+sim_dir  = out_dir+"/sim"
+comp_dir = sim_dir+"/comp"
 
-incdir_list = \"+incdir+\#{rtl_dir} +incdir+\#{ver_dir}/tb +incdir+\#{ver_dir}/uvc/#{@name}\"
-incdir_list += \" +incdir+$UVM_HOME/src $UVM_HOME/src/uvm.sv $UVM_HOME/src/dpi/uvm_dpi.cc\"
+incdir_list = "+incdir+\#{rtl_dir} +incdir+\#{ver_dir}/tb +incdir+\#{ver_dir}/uvc/#{@name}"
+incdir_list += " +incdir+$UVM_HOME/src $UVM_HOME/src/uvm.sv $UVM_HOME/src/dpi/uvm_dpi.cc"
 
-cmd_prefix = \"bsub -I \"
+cmd_prefix = "bsub -I "
 
-#compile_cmd = \"irun -elaborate \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -top #{@name}_tb_top -64bit -access +rw -uvm -v93 +define+FSDB -l irun_comp_#{@name}.log\"
+#compile_cmd = "irun -elaborate \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -top #{@name}_tb_top -64bit -access +rw -uvm -v93 +define+FSDB -l irun_comp_#{@name}.log"
 
-compile_cmd = cmd_prefix + \"vcs \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -sverilog -full64 -debug_access+all -lca -l compile.log\"
-#sim_cmd = \"irun -R -nclibdirname \#{comp_dir}/INCA_libs \#{incdir_list} -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue \#{src_dir}/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH\"
+compile_cmd = cmd_prefix + "vcs \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -sverilog -full64 -debug_access+all -lca -l compile.log"
+#sim_cmd = "irun -R -nclibdirname \#{comp_dir}/INCA_libs \#{incdir_list} -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue \#{src_dir}/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH"
 
-sim_cmd = cmd_prefix + \"../comp/simv +ntb_random_seed_automatic +UVM_VERBOSITY=UVM_HIGH -l sim.log\"
+sim_cmd = cmd_prefix + "../comp/simv +ntb_random_seed_automatic +UVM_VERBOSITY=UVM_HIGH -l sim.log"
 
-verdi_cmd = cmd_prefix + \"verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv &\"
+verdi_cmd = cmd_prefix + "verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv &"
+
+def run_cmd(type, dir, command, debug=false)
+  mkdir_p dir
+  cmd = "cd \#{dir}; \#{command}"
+  cmd += " +define+FSDB" if debug and type == :compile
+  cmd += " +UVM_CONFIG_DB_TRACE" if debug and type == :run
+  puts "Running CMD> \#{cmd}"
+  system(cmd)
+end
 
 task :default => [:run]
 
-desc \"get IP code (if any)\"
+desc "get IP code (if any)"
 task :ip do
-  cmd = \"git submodule update --init --recursive\"
-  puts \"Running CMD> \#{cmd}\"
-  system(cmd)
+  cmd = "git submodule update --init --recursive"
+  run_cmd(:ip, home_dir, cmd)
 end
 
-desc \"publish files\"
+desc "publish files"
 task :publish => [:ip] do
-  mkdir_p src_dir
-  cmd = \"ln -s \#{home_dir}/rtl \#{src_dir}\"
-  puts \"Running CMD> \#{cmd}\"
-  system(cmd)
-  cmd = \"ln -s \#{home_dir}/verif \#{src_dir}\"
-  puts \"Running CMD> \#{cmd}\"
-  system(cmd)
-  cmd = \"ln -s \#{home_dir}/ip \#{src_dir}\"
-  puts \"Running CMD> \#{cmd}\"
-  system(cmd)
+  cmd = "ln -s \#{home_dir}/rtl \#{src_dir};"
+  cmd += "ln -s \#{home_dir}/verif \#{src_dir};"
+  cmd += "ln -s \#{home_dir}/ip \#{src_dir}"
+  run_cmd(:publish, src_dir, cmd)
 end
 
-desc \"compile\"
+desc "compile"
 task :compile => [:publish] do
-  mkdir_p comp_dir
-  cmd = \"cd \#{comp_dir}; \#{compile_cmd}\"
-  puts \"Running CMD> \#{cmd}\"
-  system(cmd)
+  run_cmd(:compile, comp_dir, compile_cmd)
 end
 
-desc \"run case\"
+desc "compile with debug/waveform"
+task :compile_debug => [:publish] do
+  run_cmd(:compile, comp_dir, compile_cmd, true)
+end
+
+desc "run case"
 task :run, [:case] => [:compile] do |t, args|
   args.with_defaults(:case => '#{@name}_base_test')
-  case_dir = sim_dir+\"/\#{args[:case]}\"
-  mkdir_p case_dir
-  cmd = \"cd \#{case_dir}; \#{sim_cmd} +UVM_TESTNAME=\#{args[:case]}\"
-  puts \"Running CMD> \#{cmd}\"
-  system(cmd)
+  case_dir = sim_dir+"/\#{args[:case]}"
+  sim_cmd += " +UVM_TESTNAME=\#{args[:case]}"
+  run_cmd(:run, case_dir, sim_cmd)
 end
 
-desc \"compile with debug/waveform\"
-task :compile_debug => [:publish] do
-  mkdir_p comp_dir
-  cmd = \"cd \#{comp_dir}; \#{compile_cmd} +define+FSDB\"
-  puts \"Running CMD> \#{cmd}\"
-  system(cmd)
-end
-
-desc \"run case with debug/waveform\"
+desc "run case with debug/waveform"
 task :run_debug, [:case] => [:compile_debug] do |t, args|
   args.with_defaults(:case => '#{@name}_base_test')
-  case_dir = sim_dir+\"/\#{args[:case]}\"
-  mkdir_p case_dir
-  cmd = \"cd \#{case_dir}; \#{sim_cmd} +UVM_TESTNAME=\#{args[:case]} +UVM_CONFIG_DB_TRACE\"
-  puts \"Running CMD> \#{cmd}\"
-  system(cmd)
+  case_dir = sim_dir+"/\#{args[:case]}"
+  sim_cmd += " +UVM_TESTNAME=\#{args[:case]}"
+  run_cmd(:run, case_dir, sim_cmd, true)
 end
 
-desc \"open verdi\"
+desc "open verdi"
 task :verdi do
-  mkdir_p sim_dir
-  cmd = \"cd \#{sim_dir}; \#{verdi_cmd}\"
-  puts \"Running CMD> \#{cmd}\"
-  system(cmd)
+  run_cmd(:verdi, sim_dir, verdi_cmd)
 end
 		HEREDOC_RAKE
     end
