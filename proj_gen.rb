@@ -32,9 +32,9 @@ class UVM_gen_file < UVM_gen_base
     
     def to_f
         puts "Generating file: #{@file}"
-        f = File::new(@file, "w")
-        f.puts to_s
-        f.close
+        File::open(@file, "w") do |f|
+          f.puts to_s
+		end
     end
 
 end
@@ -69,11 +69,15 @@ class UVM_gen_if < UVM_gen_file
     end
     
     def to_s
-        s = "interface #{@name}_if;\n\n"
-        s += "  // Control flags\n"
-        s += "  bit has_checks = 1;\n"
-        s += "  bit has_coverage = 1;\n\n"
-        s += "  // Actual signals\n"
+        s = <<-HEREDOC_IF
+interface #{@name}_if;
+
+  // Control flags
+  bit has_checks = 1;
+  bit has_coverage = 1;
+
+  // Actual signals
+		HEREDOC_IF
         
         @p_list.each do |p|
             if p.type == "inout"
@@ -100,24 +104,30 @@ class UVM_gen_item < UVM_gen_file
     end
     
     def to_s
-        s = "class #{@name}_item extends uvm_sequence_item;\n\n"
-        s += "  rand int unsigned addr;\n"
-        s += "  rand int unsigned data;\n"
-        s += "  rand int unsigned delay;\n\n"
-        s += "  constraint c1 {addr < 16'h2000;}\n"
-        s += "  constraint c2 {data < 16'h1000;}\n\n" 
-        s += "  //UVM automation macros for general objects\n"
-        s += "  `uvm_object_utils_begin(#{@name}_item)\n"
-        s += "    `uvm_field_int(addr, UVM_ALL_ON)\n"
-        s += "    `uvm_field_int(data, UVM_ALL_ON)\n"
-        s += "    `uvm_field_int(delay, UVM_ALL_ON)\n"
-        s += "  `uvm_object_utils_end\n\n" 
-        s += "  // Constructor\n"
-        s += "  function new (string name = \"#{@name}_item\");\n"
-        s += "    super.new(name);\n"
-        s += "  endfunction: new\n\n"
-        s += "endclass: #{@name}_item\n"
-        
+        s = <<-HEREDOC_ITEM
+class #{@name}_item extends uvm_sequence_item;
+
+  rand int unsigned addr;
+  rand int unsigned data;
+  rand int unsigned delay;
+
+  constraint c1 {addr < 16'h2000;}
+  constraint c2 {data < 16'h1000;}
+
+  //UVM automation macros for general objects
+  `uvm_object_utils_begin(#{@name}_item)
+    `uvm_field_int(addr, UVM_ALL_ON)
+    `uvm_field_int(data, UVM_ALL_ON)
+    `uvm_field_int(delay, UVM_ALL_ON)
+  `uvm_object_utils_end\n\n" 
+
+  // Constructor
+  function new (string name = \"#{@name}_item\");
+    super.new(name);
+  endfunction: new
+
+endclass: #{@name}_item
+        HEREDOC_ITEM
     end
 
 end
@@ -131,45 +141,55 @@ class UVM_gen_drv < UVM_gen_file
     end
     
     def to_s
-        s = "class #{@name}_driver extends uvm_driver #(#{@name}_item);\n\n"
-        s += "  #{@name}_item item;\n"
-        s += "  virtual #{@name}_if vif;\n\n"
-        s += "  // UVM automation macros for general components\n"
-        s += "  `uvm_component_utils(#{@name}_driver)\n\n"
-        s += "  // Constructor\n"
-        s += "  function new (string name = \"#{@name}_driver\", uvm_component parent);\n"
-        s += "    super.new(name, parent);\n"
-        s += "  endfunction: new\n\n"
-        s += "  function void build_phase(uvm_phase phase);\n"
-        s += "    string inst_name;\n"
-        s += "    super.build_phase(phase);\n"
-        s += "    if (!uvm_config_db#(virtual #{@name}_if)::get(this,\"\",\"vif\",vif))\n"
-        s += "      `uvm_fatal(\"NOVIF\", {\"virtual interface must be set for: \",\n"
-        s += "      get_full_name(),\".vif\"});\n"
-        s += "  endfunction: build_phase\n\n"
-        s += "  virtual task run_phase(uvm_phase phase);\n"
-        s += "    forever begin\n"
-        s += "      // Get the next data item from sequencer (may block)\n"
-        s += "      seq_item_port.get_next_item(item);\n"
-        s += "      // Execute the item\n"
-        s += "      drive_item(item);\n"
-        s += "      seq_item_port.item_done(); // Consume the request\n"
-        s += "    end\n"
-        s += "  endtask: run_phase\n\n"
-        s += "  virtual task drive_item (input #{@name}_item item);\n"
-        s += "    // Add your logic here.\n"
-		s += "    `uvm_info(get_type_name(), \"driving item\", UVM_LOW)\n\n"
-	    s += "    fork\n"
-	    s += "      begin\n"
-	    s += "      end\n"
-	    s += "      begin\n"
-	    s += "      end\n"
-	    s += "    join_any\n"
-        s += "    disable fork;\n\n"
-        s += "    #10;\n"
-        s += "  endtask: drive_item\n\n"
-        s += "endclass: #{@name}_driver\n"
-        
+        s = <<-HEREDOC_DRV
+class #{@name}_driver extends uvm_driver #(#{@name}_item);
+
+  #{@name}_item item;
+  virtual #{@name}_if vif;
+
+  // UVM automation macros for general components
+  `uvm_component_utils(#{@name}_driver)
+
+  // Constructor
+  function new (string name = \"#{@name}_driver\", uvm_component parent);
+    super.new(name, parent);
+  endfunction: new
+
+  function void build_phase(uvm_phase phase);
+    string inst_name;
+    super.build_phase(phase);
+    if (!uvm_config_db#(virtual #{@name}_if)::get(this,\"\",\"vif\",vif))
+      `uvm_fatal(\"NOVIF\", {\"virtual interface must be set for: \",
+      get_full_name(),\".vif\"});
+  endfunction: build_phase
+
+  virtual task run_phase(uvm_phase phase);
+    forever begin
+      // Get the next data item from sequencer (may block)
+      seq_item_port.get_next_item(item);
+      // Execute the item
+      drive_item(item);
+      seq_item_port.item_done(); // Consume the request
+    end
+  endtask: run_phase
+
+  virtual task drive_item (input #{@name}_item item);
+    // Add your logic here.
+    `uvm_info(get_type_name(), \"driving item\", UVM_LOW)
+
+    fork
+      begin
+      end
+      begin
+      end
+    join_any
+    disable fork;
+
+    #10;
+  endtask: drive_item
+
+endclass: #{@name}_driver
+        HEREDOC_DRV
     end
 
 end
@@ -183,60 +203,72 @@ class UVM_gen_mon < UVM_gen_file
     end
     
     def to_s
-        s = "class #{@name}_monitor extends uvm_monitor;\n\n"
-        s += "  virtual #{@name}_if vif;\n\n"
-		s += "  bit checks_enable = 1; // Control checking in monitor and interface\n"
-        s += "  bit coverage_enable = 1; // Control coverage in monitor and interface\n"
-		s += "  uvm_analysis_port #(#{@name}_item) item_collected_port;\n"
-        s += "  event cov_transaction; // Events needed to trigger covergroups\n"
-        s += "  protected #{@name}_item trans_collected;\n\n"
-        s += "  // UVM automation macros for general components\n"
-        s += "  `uvm_component_utils_begin(#{@name}_monitor)\n"
-		s += "    `uvm_field_int(checks_enable, UVM_ALL_ON)\n"
-        s += "    `uvm_field_int(coverage_enable, UVM_ALL_ON)\n"
-        s += "  `uvm_component_utils_end\n\n"
-        s += "  // Coverage\n"
-		s += "  covergroup cov_trans @cov_transaction;\n"
-        s += "  option.per_instance = 1;\n"
-        s += "    // Coverage bins definition\n"
-        s += "  endgroup: cov_trans\n\n"
-        s += "  // Constructor\n"
-        s += "  function new (string name = \"#{@name}_monitor\", uvm_component parent);\n"
-        s += "    super.new(name, parent);\n"
-		s += "      cov_trans = new();\n"
-        s += "      cov_trans.set_inst_name({get_full_name(), \".cov_trans\"});\n"
-        s += "      trans_collected = new();\n"
-        s += "      item_collected_port = new(\"item_collected_port\", this);\n"
-        s += "  endfunction: new\n\n"
-        s += "  function void build_phase(uvm_phase phase);\n"
-        s += "    string inst_name;\n"
-        s += "    super.build_phase(phase);\n"
-        s += "    if (!uvm_config_db#(virtual #{@name}_if)::get(this,\"\",\"vif\",vif))\n"
-        s += "      `uvm_fatal(\"NOVIF\", {\"virtual interface must be set for: \",\n"
-        s += "      get_full_name(),\".vif\"});\n"
-        s += "  endfunction: build_phase\n\n"
-        s += "  virtual task run_phase(uvm_phase phase);\n"
-		s += "    collect_transactions(); // collector task\n"
-        s += "  endtask: run_phase\n\n"
-        s += "  virtual protected task collect_transactions();\n"
-        s += "    //forever begin\n"
-		s += "      //@(posedge vif.clock);\n"
-        s += "      // Collect the data from the bus into trans_collected\n"
-        s += "      if (checks_enable)\n"
-        s += "        perform_transfer_checks();\n"
-        s += "      if (coverage_enable)\n"
-        s += "        perform_transfer_coverage();\n"
-        s += "      item_collected_port.write(trans_collected);\n"
-        s += "    //end\n"
-        s += "  endtask: collect_transactions\n\n"
-		s += "  virtual protected function void perform_transfer_coverage();\n"
-        s += "    -> cov_transaction;\n"
-        s += "  endfunction: perform_transfer_coverage\n\n"
-        s += "  virtual protected function void perform_transfer_checks();\n"
-        s += "    // Perform data checks on trans_collected.\n"
-        s += "  endfunction: perform_transfer_checks\n\n"
-        s += "endclass: #{@name}_monitor\n"
-        
+        s = <<-HEREDOC_MON
+class #{@name}_monitor extends uvm_monitor;
+
+  virtual #{@name}_if vif;
+
+  bit checks_enable = 1; // Control checking in monitor and interface
+  bit coverage_enable = 1; // Control coverage in monitor and interface
+  uvm_analysis_port #(#{@name}_item) item_collected_port;
+  event cov_transaction; // Events needed to trigger covergroups
+  protected #{@name}_item trans_collected;
+
+  // UVM automation macros for general components
+  `uvm_component_utils_begin(#{@name}_monitor)
+    `uvm_field_int(checks_enable, UVM_ALL_ON)
+    `uvm_field_int(coverage_enable, UVM_ALL_ON)
+  `uvm_component_utils_end
+
+  // Coverage
+  covergroup cov_trans @cov_transaction;
+  option.per_instance = 1;
+    // Coverage bins definition
+  endgroup: cov_trans
+
+  // Constructor
+  function new (string name = \"#{@name}_monitor\", uvm_component parent);
+    super.new(name, parent);
+      cov_trans = new();
+      cov_trans.set_inst_name({get_full_name(), \".cov_trans\"});
+      trans_collected = new();
+      item_collected_port = new(\"item_collected_port\", this);
+  endfunction: new
+
+  function void build_phase(uvm_phase phase);
+    string inst_name;
+    super.build_phase(phase);
+    if (!uvm_config_db#(virtual #{@name}_if)::get(this,\"\",\"vif\",vif))
+      `uvm_fatal(\"NOVIF\", {\"virtual interface must be set for: \",
+      get_full_name(),\".vif\"});
+  endfunction: build_phase
+
+  virtual task run_phase(uvm_phase phase);
+    collect_transactions(); // collector task
+  endtask: run_phase
+
+  virtual protected task collect_transactions();
+    //forever begin
+      //@(posedge vif.clock);
+      // Collect the data from the bus into trans_collected
+      if (checks_enable)
+        perform_transfer_checks();
+      if (coverage_enable)
+        perform_transfer_coverage();
+      item_collected_port.write(trans_collected);
+    //end
+  endtask: collect_transactions
+
+  virtual protected function void perform_transfer_coverage();
+    -> cov_transaction;
+  endfunction: perform_transfer_coverage
+
+  virtual protected function void perform_transfer_checks();
+    // Perform data checks on trans_collected.
+  endfunction: perform_transfer_checks
+
+endclass: #{@name}_monitor
+        HEREDOC_MON
     end
 
 end
@@ -252,13 +284,18 @@ class UVM_gen_seqr < UVM_gen_file
     end
     
     def to_s
-        s = "class #{@name}_sequencer extends uvm_sequencer #(#{@name}_item);\n\n"
-        s += "  `uvm_component_utils(#{@name}_sequencer)\n\n"
-        s += "  // Constructor\n"
-        s += "  function new (string name, uvm_component parent);\n"
-        s += "    super.new(name, parent);\n"
-        s += "  endfunction: new\n\n"
-        s += "endclass: #{@name}_sequencer\n"
+        s = <<-HEREDOC_SEQR
+class #{@name}_sequencer extends uvm_sequencer #(#{@name}_item);
+
+  `uvm_component_utils(#{@name}_sequencer)
+
+  // Constructor
+  function new (string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction: new
+
+endclass: #{@name}_sequencer
+		HEREDOC_SEQR
     end
 
 end
@@ -272,36 +309,45 @@ class UVM_gen_agent < UVM_gen_file
     end
     
     def to_s
-        s = "class #{@name}_agent extends uvm_agent;\n\n"
-		s += "  uvm_active_passive_enum is_active;\n\n"
-        s += "  // UVM automation macros\n"
-        s += "  `uvm_component_utils_begin(#{@name}_agent)\n"
-		s += "    `uvm_field_enum(uvm_active_passive_enum, is_active, UVM_ALL_ON)\n"
-        s += "  `uvm_component_utils_end\n\n"
-        s += "  // Constructor\n"
-        s += "  function new (string name, uvm_component parent);\n"
-        s += "    super.new(name, parent);\n"
-        s += "  endfunction: new\n\n"
-        s += "  uvm_sequencer #(#{@name}_item) sequencer;\n"
-        s += "  #{@name}_driver driver;\n"
-        s += "  #{@name}_monitor monitor;\n\n"
-        s += "  // Use build_phase to create agents's subcomponents\n"
-        s += "  virtual function void build_phase(uvm_phase phase);\n"
-        s += "    super.build_phase(phase);\n"
-        s += "    monitor = #{@name}_monitor::type_id::create(\"monitor\",this);\n"
-        s += "    if (is_active == UVM_ACTIVE) begin\n"
-        s += "      // Build the sequencer and driver\n"
-        s += "      sequencer =\n"
-        s += "      uvm_sequencer#(#{@name}_item)::type_id::create(\"sequencer\",this);\n"
-        s += "      driver = #{@name}_driver::type_id::create(\"driver\",this);\n"
-        s += "    end\n\n"
-        s += "  endfunction: build_phase\n\n"
-        s += "  virtual function void connect_phase(uvm_phase phase);\n"
-        s += "    if(is_active == UVM_ACTIVE) begin\n"
-        s += "      driver.seq_item_port.connect(sequencer.seq_item_export);\n"
-        s += "    end\n"
-        s += "  endfunction: connect_phase\n\n"
-        s += "endclass: #{@name}_agent\n"
+        s = <<-HEREDOC_AGENT
+class #{@name}_agent extends uvm_agent;
+
+  uvm_active_passive_enum is_active;
+
+  // UVM automation macros
+  `uvm_component_utils_begin(#{@name}_agent)
+    `uvm_field_enum(uvm_active_passive_enum, is_active, UVM_ALL_ON)
+  `uvm_component_utils_end
+
+  // Constructor
+  function new (string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction: new
+
+  uvm_sequencer #(#{@name}_item) sequencer;
+  #{@name}_driver driver;
+  #{@name}_monitor monitor;
+  #
+  // Use build_phase to create agents's subcomponents
+  virtual function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    monitor = #{@name}_monitor::type_id::create(\"monitor\",this);
+    if (is_active == UVM_ACTIVE) begin
+      // Build the sequencer and driver
+      sequencer =
+      uvm_sequencer#(#{@name}_item)::type_id::create(\"sequencer\",this);
+      driver = #{@name}_driver::type_id::create(\"driver\",this);
+    end
+  endfunction: build_phase
+
+  virtual function void connect_phase(uvm_phase phase);
+    if(is_active == UVM_ACTIVE) begin
+      driver.seq_item_port.connect(sequencer.seq_item_export);
+    end
+  endfunction: connect_phase
+
+endclass: #{@name}_agent
+        HEREDOC_AGENT
     end
     
 end
@@ -315,28 +361,37 @@ class UVM_gen_sb < UVM_gen_file
     end
     
     def to_s
-        s = "class #{@name}_scoreboard extends uvm_scoreboard;\n\n"
-        s += "  uvm_analysis_imp#(#{@name}_item, #{@name}_scoreboard) item_collected_export;\n\n"
-        s += "  protected bit disable_scoreboard = 0;\n"
-        s += "  int sb_error = 0;\n\n"
-        s += "  // Provide implementations of virtual methods such as get_type_name and create\n"
-        s += "  `uvm_component_utils_begin(#{@name}_scoreboard)\n"
-        s += "    `uvm_field_int(disable_scoreboard, UVM_ALL_ON)\n"
-        s += "  `uvm_component_utils_end\n\n"
-        s += "  // Constructor\n"
-        s += "  function new (string name, uvm_component parent);\n"
-        s += "    super.new(name, parent);\n"
-        s += "  endfunction: new\n\n"
-        s += "  // build_phase\n"
-        s += "  function void build_phase(uvm_phase phase);\n"
-        s += "    item_collected_export = new(\"item_collected_export\", this);\n"
-        s += "  endfunction\n\n"
-        s += "  // Provide implementation of write()\n"
-        s += "  virtual function void write(#{@name}_item trans);\n"
-        s += "    if(!disable_scoreboard) begin\n"
-        s += "    end\n"
-        s += "  endfunction: write\n\n"
-        s += "endclass\n"
+        s = <<-HEREDOC_SB
+class #{@name}_scoreboard extends uvm_scoreboard;
+
+  uvm_analysis_imp#(#{@name}_item, #{@name}_scoreboard) item_collected_export;
+
+  protected bit disable_scoreboard = 0;
+  int sb_error = 0;
+
+  // Provide implementations of virtual methods such as get_type_name and create
+  `uvm_component_utils_begin(#{@name}_scoreboard)
+    `uvm_field_int(disable_scoreboard, UVM_ALL_ON)
+  `uvm_component_utils_end
+
+  // Constructor
+  function new (string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction: new
+
+  // build_phase
+  function void build_phase(uvm_phase phase);
+    item_collected_export = new(\"item_collected_export\", this);
+  endfunction
+
+  // Provide implementation of write()
+  virtual function void write(#{@name}_item trans);
+    if(!disable_scoreboard) begin
+    end
+  endfunction: write
+
+endclass
+        HEREDOC_SB
     end
 end
 
@@ -349,45 +404,62 @@ class UVM_gen_env < UVM_gen_file
     end
     
     def to_s
-        s = "class #{@name}_env extends uvm_env;\n\n"
-        s += "  // Virtual interface variable\n"
-        s += "  protected virtual interface #{@name}_if vif;\n\n"
-        s += "  // Control properties\n"
-		s += "  protected int num_masters = 0;\n\n"
-        s += "  // Components of the env\n"
-        s += "  #{@name}_agent masters[];\n"
-		s += "  #{@name}_scoreboard scoreboard0;\n\n"
-        s += "  `uvm_component_utils_begin(#{@name}_env)\n"
-        s += "    `uvm_field_int(num_masters, UVM_ALL_ON)\n"
-        s += "  `uvm_component_utils_end\n\n"
-        s += "  virtual function void build_phase(uvm_phase phase);\n"
-        s += "    string inst_name;\n"
-        s += "    super.build_phase(phase);\n\n"
-        s += "    if(!uvm_config_db#(virtual #{@name}_if)::get(this, \"\", \"vif\", vif))\n"
-        s += "      `uvm_fatal(\"NOVIF\",{\"virtual interface must be set for: \",get_full_name(),\".vif\"});\n\n"
-        s += "    if(num_masters ==0)\n"
-        s += "      `uvm_fatal(\"NONUM\",{\"'num_masters' must be set for: \", get_full_name()});\n\n"
-		s += "    //uvm_config_db#(uvm_active_passive_enum)::set(this,\n"
-		s += "    uvm_config_db#(int)::set(this,\n"
-		s += "      \"masters*\", \"is_active\", UVM_ACTIVE);\n\n"
-        s += "    masters = new[num_masters];\n"
-        s += "    for(int i = 0; i < num_masters; i++) begin\n"
-        s += "      $sformat(inst_name, \"masters[%0d]\", i);\n"
-        s += "      masters[i] = #{@name}_agent::type_id::create(inst_name, this);\n"
-        s += "    end\n\n"
-		s += "    scoreboard0 = #{@name}_scoreboard::type_id::create(\"scoreboard0\", this);\n\n"
-        s += "    // Build slaves and other components\n\n"
-        s += "  endfunction\n\n"
-        s += "  virtual function void connect_phase(uvm_phase phase);\n"
-        s += "    // Connect monitor to scoreboard\n"
-        s += "    masters[0].monitor.item_collected_port.connect(\n"
-        s += "      scoreboard0.item_collected_export);\n"
-        s += "  endfunction: connect_phase\n\n"
-        s += "  // Constructor\n"
-        s += "  function new(string name, uvm_component parent);\n"
-        s += "    super.new(name, parent);\n"
-        s += "  endfunction: new\n\n"
-        s += "endclass\n"
+        s = <<-HEREDOC_ENV
+class #{@name}_env extends uvm_env;
+
+  // Virtual interface variable
+  protected virtual interface #{@name}_if vif;
+
+  // Control properties
+  protected int num_masters = 0;
+
+  // Components of the env
+  #{@name}_agent masters[];
+  #{@name}_scoreboard scoreboard0;
+
+  `uvm_component_utils_begin(#{@name}_env)
+    `uvm_field_int(num_masters, UVM_ALL_ON)
+  `uvm_component_utils_end
+
+  virtual function void build_phase(uvm_phase phase);
+    string inst_name;
+    super.build_phase(phase);
+
+    if(!uvm_config_db#(virtual #{@name}_if)::get(this, \"\", \"vif\", vif))
+      `uvm_fatal(\"NOVIF\",{\"virtual interface must be set for: \",get_full_name(),\".vif\"});
+
+    if(num_masters ==0)
+      `uvm_fatal(\"NONUM\",{\"'num_masters' must be set for: \", get_full_name()});
+
+    //uvm_config_db#(uvm_active_passive_enum)::set(this,
+    uvm_config_db#(int)::set(this,
+      \"masters*\", \"is_active\", UVM_ACTIVE);
+
+    masters = new[num_masters];
+    for(int i = 0; i < num_masters; i++) begin
+      $sformat(inst_name, \"masters[%0d]\", i);
+      masters[i] = #{@name}_agent::type_id::create(inst_name, this);
+    end
+
+    scoreboard0 = #{@name}_scoreboard::type_id::create(\"scoreboard0\", this);
+
+    // Build slaves and other components
+
+  endfunction
+
+  virtual function void connect_phase(uvm_phase phase);
+    // Connect monitor to scoreboard
+    masters[0].monitor.item_collected_port.connect(
+      scoreboard0.item_collected_export);
+  endfunction: connect_phase
+
+  // Constructor
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction: new
+
+endclass
+        HEREDOC_ENV
     end
     
 end
@@ -401,39 +473,48 @@ class UVM_gen_test < UVM_gen_file
     end
     
     def to_s
-        s = "class #{@name}_base_test extends uvm_test;\n\n"
-		s += "  `uvm_component_utils(#{@name}_base_test)\n\n"
-        s += "  #{@name}_env #{@name}_env0;\n\n"
-        s += "  // The test’s constructor\n"
-        s += "  function new (string name = \"#{@name}_base_test\",\n"
-        s += "    uvm_component parent = null);\n"
-        s += "    super.new(name, parent);\n"
-        s += "  endfunction\n\n"
-        s += "  // Update this component's properties and create the #{@name}_env component\n"
-        s += "  virtual function void build_phase(uvm_phase phase); // create the top-level environment.\n\n"
-		s += "    //For derived class, super.build_phase() through the base class,\n"
-		s += "    // will create the top-level environment and all its subcomponents\n"
-		s += "    //Therefore, any configuration that will affect the building\n"
-		s += "    // of these components must be set before calling super.build_phase()\n"
-        s += "    uvm_config_db#(int)::set(this,\"#{@name}_env0\", \"num_masters\", 1);\n"
-        s += "    super.build_phase(phase);\n"
-        s += "    #{@name}_env0 =\n"
-        s += "      #{@name}_env::type_id::create(\"#{@name}_env0\", this);\n"
-        s += "    //Since the sequences don’t get started until a later phase,\n"
-        s += "    // they could be called after super.build_phase()\n"
-        s += "    uvm_config_db#(uvm_object_wrapper)::\n"
-        s += "      set(this, \"#{@name}_env0.masters[0].sequencer.run_phase\",\n"
-        s += "      \"default_sequence\", #{@name}_base_seq::type_id::get());\n"
-        s += "  endfunction\n\n"
-        s += "  function void end_of_elaboration_phase(uvm_phase phase);\n"
-        s += "    uvm_top.print_topology();\n"
-        s += "  endfunction: end_of_elaboration_phase\n\n"
-		s += "  virtual task run_phase(uvm_phase phase);\n"
-        s += "    //set a drain-time for the environment if desired \n"
-        s += "    phase.phase_done.set_drain_time(this, 5000);\n"
-        s += "  endtask\n\n"
-        s += "endclass\n"
+        s = <<-HEREDOC_TEST
+class #{@name}_base_test extends uvm_test;
 
+  `uvm_component_utils(#{@name}_base_test)
+
+  #{@name}_env #{@name}_env0;
+  #
+  // The test’s constructor
+  function new (string name = \"#{@name}_base_test\",
+    uvm_component parent = null);
+    super.new(name, parent);
+  endfunction
+
+  // Update this component's properties and create the #{@name}_env component
+  virtual function void build_phase(uvm_phase phase); // create the top-level environment.
+
+    //For derived class, super.build_phase() through the base class,
+    // will create the top-level environment and all its subcomponents
+    //Therefore, any configuration that will affect the building
+    // of these components must be set before calling super.build_phase()
+    uvm_config_db#(int)::set(this,\"#{@name}_env0\", \"num_masters\", 1);
+    super.build_phase(phase);
+    #{@name}_env0 =
+      #{@name}_env::type_id::create(\"#{@name}_env0\", this);
+    //Since the sequences don’t get started until a later phase,
+    // they could be called after super.build_phase()
+    uvm_config_db#(uvm_object_wrapper)::
+      set(this, \"#{@name}_env0.masters[0].sequencer.run_phase\",
+      \"default_sequence\", #{@name}_base_seq::type_id::get());
+  endfunction
+
+  function void end_of_elaboration_phase(uvm_phase phase);
+    uvm_top.print_topology();
+  endfunction: end_of_elaboration_phase
+
+  virtual task run_phase(uvm_phase phase);
+    //set a drain-time for the environment if desired 
+    phase.phase_done.set_drain_time(this, 5000);
+  endtask
+
+endclass
+        HEREDOC_TEST
     end
     
 end
@@ -447,30 +528,38 @@ class UVM_gen_seq < UVM_gen_file
     end
     
     def to_s
-        s = "class #{@name}_base_seq extends uvm_sequence #(#{@name}_item);\n\n"
-		s += "  rand int count;\n"
-        s += "  constraint c1 { count > 0; count < 10; }\n\n"
-        s += "  // Register with the factory\n"
-        s += "  `uvm_object_utils_begin(#{@name}_base_seq)\n"
-		s += "    `uvm_field_int(count, UVM_ALL_ON)\n"
-        s += "  `uvm_object_utils_end\n\n"
-        s += "  // The sequence’s constructor\n"
-        s += "  function new (string name = \"#{@name}_base_seq\");\n"
-        s += "    super.new(name);\n"
-        s += "  endfunction\n\n"
-		s += "  virtual task body();\n"
-		s += "    `uvm_info(get_type_name(), $psprintf(\"has %0d item(s)\", count), UVM_LOW)\n"
-        s += "    repeat (count)\n"
-        s += "      `uvm_do(req)\n"
-        s += "  endtask\n\n"
-        s += "  virtual task pre_body();\n"
-        s += "    uvm_test_done.raise_objection(this);\n"
-        s += "  endtask\n\n"
-        s += "  virtual task post_body();\n"
-        s += "    uvm_test_done.drop_objection(this);\n"
-        s += "  endtask\n\n"
-        s += "endclass\n"
+        s = <<-HEREDOC_SEQ
+class #{@name}_base_seq extends uvm_sequence #(#{@name}_item);
 
+  rand int count;
+  constraint c1 { count > 0; count < 10; }
+
+  // Register with the factory
+  `uvm_object_utils_begin(#{@name}_base_seq)
+    `uvm_field_int(count, UVM_ALL_ON)
+  `uvm_object_utils_end
+
+  // The sequence’s constructor
+  function new (string name = \"#{@name}_base_seq\");
+    super.new(name);
+  endfunction
+
+  virtual task body();
+    `uvm_info(get_type_name(), $psprintf(\"has %0d item(s)\", count), UVM_LOW)
+    repeat (count)
+      `uvm_do(req)
+  endtask
+
+  virtual task pre_body();
+    uvm_test_done.raise_objection(this);
+  endtask
+
+  virtual task post_body();
+    uvm_test_done.drop_objection(this);
+  endtask
+
+endclass
+        HEREDOC_SEQ
     end
     
 end
@@ -490,14 +579,21 @@ class UVM_gen_tb_top < UVM_gen_file
     end
     
     def to_s
-        s = "`include \"#{@name}_pkg.sv\"\n"
-        s += "`include \"#{@name}_if.sv\"\n\n"
-        s += "`include \"#{@dut_file}\"\n\n"
-        s += "module #{@name}_tb_top;\n\n"
-        s += "  import uvm_pkg::*;\n"
-        s += "  import #{@name}_pkg::*;\n\n"
-        s += "  #{@name}_if vif(); //SystemVerilog Interface\n\n"
-        s += "  #{@dut_mod} dut(\n"
+        s = <<-HEREDOC_TOP
+`include \"#{@name}_pkg.sv\"
+`include \"#{@name}_if.sv\"
+
+`include \"#{@dut_file}\"
+
+module #{@name}_tb_top;
+
+  import uvm_pkg::*;
+  import #{@name}_pkg::*;
+
+  #{@name}_if vif(); //SystemVerilog Interface
+
+  #{@dut_mod} dut(
+		HEREDOC_TOP
 
         @p_list.each do |p|
 			s += "    vif.#{p.name}"
@@ -506,30 +602,37 @@ class UVM_gen_tb_top < UVM_gen_file
 		    s += "\n"
         end
 
-        s += "  );\n\n"
-        s += "  initial begin\n"
-		s += "    //automatic uvm_coreservice_t cs_ = uvm_coreservice_t::get();\n"
-        s += "    //uvm_config_db#(virtual #{@name}_if)::set(cs_.get_root(), \"*\", \"vif\", vif);\n"
-		s += "    uvm_config_db#(virtual #{@name}_if)::set(null, \"*.#{@name}_env0*\", \"vif\", vif);\n"
-        s += "    run_test();\n"
-        s += "  end\n\n"
-        s += "  initial begin\n"
-        s += "    //vif.sig_reset <= 1'b1;\n"
-        s += "    //vif.sig_clock <= 1'b1;\n"
-        s += "    //#50 vif.sig_reset = 1'b0;\n"
-        s += "  end\n\n"
-        s += "  //Generate Clock\n"
-        s += "  //always\n"
-        s += "  //  #5 vif.sig_clock = ~vif.sig_clock;\n\n"
-        s += "  //dump fsdb\n"
-        s += "  `ifdef FSDB\n"
-        s += "  initial begin\n"
-        s += " 	  $fsdbDumpfile(\"novas.fsdb\");\n"
-        s += "    $fsdbDumpvars(0, #{@name}_tb_top);\n"
-        s += "    $fsdbDumpflush;\n"
-        s += "  end\n"
-        s += "  `endif\n\n"
-        s += "endmodule\n"
+        s += <<-HEREDOC_TOP
+  );
+
+  initial begin
+    //automatic uvm_coreservice_t cs_ = uvm_coreservice_t::get();
+    //uvm_config_db#(virtual #{@name}_if)::set(cs_.get_root(), \"*\", \"vif\", vif);
+    uvm_config_db#(virtual #{@name}_if)::set(null, \"*.#{@name}_env0*\", \"vif\", vif);
+    run_test();
+  end
+
+  initial begin
+    //vif.sig_reset <= 1'b1;
+    //vif.sig_clock <= 1'b1;
+    //#50 vif.sig_reset = 1'b0;
+  end
+
+  //Generate Clock
+  //always
+  //  #5 vif.sig_clock = ~vif.sig_clock;
+
+  //dump fsdb
+  `ifdef FSDB
+  initial begin
+ 	  $fsdbDumpfile(\"novas.fsdb\");
+    $fsdbDumpvars(0, #{@name}_tb_top);
+    $fsdbDumpflush;
+  end
+  `endif
+
+endmodule
+		HEREDOC_TOP
     end
     
 end
@@ -544,18 +647,22 @@ class UVM_gen_pkg < UVM_gen_file
     end
     
     def to_s
-        s = "package #{@name}_pkg;\n\n"
-        s += "  import uvm_pkg::*;\n"
-        s += "  `include \"uvm_macros.svh\"\n\n"
-        s += "  `include \"#{@name}_item.sv\"\n"
-        s += "  `include \"#{@name}_drv.sv\"\n"
-        s += "  `include \"#{@name}_mon.sv\"\n"
-        s += "  `include \"#{@name}_agent.sv\"\n"
-        s += "  `include \"#{@name}_scoreboard.sv\"\n"
-        s += "  `include \"#{@name}_env.sv\"\n"
-        s += "  `include \"#{@name}_seq_lib.sv\"\n"
-        s += "  `include \"#{@name}_test_lib.sv\"\n"
-        s += "endpackage: #{@name}_pkg\n\n"
+        s = <<-HEREDOC_PKG
+package #{@name}_pkg;
+
+  import uvm_pkg::*;
+  `include \"uvm_macros.svh\"
+
+  `include \"#{@name}_item.sv\"
+  `include \"#{@name}_drv.sv\"
+  `include \"#{@name}_mon.sv\"
+  `include \"#{@name}_agent.sv\"
+  `include \"#{@name}_scoreboard.sv\"
+  `include \"#{@name}_env.sv\"
+  `include \"#{@name}_seq_lib.sv\"
+  `include \"#{@name}_test_lib.sv\"
+endpackage: #{@name}_pkg
+		HEREDOC_PKG
     end
     
 end
@@ -569,95 +676,97 @@ class UVM_gen_rakefile < UVM_gen_file
     end
     
     def to_s
+		s = <<-HEREDOC_RAKE
+home_dir = Dir.pwd
+out_dir  = home_dir+\"/out\"
+src_dir  = out_dir+\"/src\"
+ip_dir   = src_dir+\"/ip\"
+rtl_dir  = src_dir+\"/rtl\"
+ver_dir  = src_dir+\"/verif\"
+sim_dir  = out_dir+\"/sim\"
+comp_dir = sim_dir+\"/comp\"
 
-		s = "home_dir = Dir.pwd\n"
-        s += "out_dir  = home_dir+\"/out\"\n"
-        s += "src_dir  = out_dir+\"/src\"\n"
-        s += "ip_dir   = src_dir+\"/ip\"\n"
-        s += "rtl_dir  = src_dir+\"/rtl\"\n"
-        s += "ver_dir  = src_dir+\"/verif\"\n"
-        s += "sim_dir  = out_dir+\"/sim\"\n"
-		s += "comp_dir = sim_dir+\"/comp\"\n\n"
+incdir_list = \"+incdir+\#{rtl_dir} +incdir+\#{ver_dir}/tb +incdir+\#{ver_dir}/uvc/#{@name}\"
+incdir_list += \" +incdir+$UVM_HOME/src $UVM_HOME/src/uvm.sv $UVM_HOME/src/dpi/uvm_dpi.cc\"
 
-		s += "incdir_list = \"+incdir+\#{rtl_dir} +incdir+\#{ver_dir}/tb +incdir+\#{ver_dir}/uvc/#{@name}\"\n"
-	        s += "incdir_list += \" +incdir+$UVM_HOME/src $UVM_HOME/src/uvm.sv $UVM_HOME/src/dpi/uvm_dpi.cc\"\n\n"
-	    
-	        s += "cmd_prefix = \"bsub -I \"\n\n"
+cmd_prefix = \"bsub -I \"
 
-		s += "#compile_cmd = \"irun -elaborate \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -top #{@name}_tb_top -64bit -access +rw -uvm -v93 +define+FSDB -l irun_comp_#{@name}.log\"\n\n"
-	        s += "compile_cmd = cmd_prefix + \"vcs \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -sverilog -full64 -debug_access+all -lca -l compile.log\"\n"
+#compile_cmd = \"irun -elaborate \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -top #{@name}_tb_top -64bit -access +rw -uvm -v93 +define+FSDB -l irun_comp_#{@name}.log\"
 
-		s += "#sim_cmd = \"irun -R -nclibdirname \#{comp_dir}/INCA_libs \#{incdir_list} -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue \#{src_dir}/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH\"\n\n"
-	        s += "sim_cmd = cmd_prefix + \"../comp/simv +ntb_random_seed_automatic +UVM_VERBOSITY=UVM_HIGH -l sim.log\"\n\n"
-	    
-	        s += "verdi_cmd = cmd_prefix + \"verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv &\"\n\n"
+compile_cmd = cmd_prefix + \"vcs \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -sverilog -full64 -debug_access+all -lca -l compile.log\"
+#sim_cmd = \"irun -R -nclibdirname \#{comp_dir}/INCA_libs \#{incdir_list} -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue \#{src_dir}/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH\"
 
-		s += "task :default => [:run]\n\n"
+sim_cmd = cmd_prefix + \"../comp/simv +ntb_random_seed_automatic +UVM_VERBOSITY=UVM_HIGH -l sim.log\"
 
-        s += "desc \"get IP code (if any)\"\n"
-        s += "task :ip do\n"
-		s += "\tcmd = \"git submodule update --init --recursive\"\n"
-		s += "\tputs \"Running CMD> \#{cmd}\"\n"
-		s += "\tsystem(cmd)\n"
-		s += "end\n\n"
+verdi_cmd = cmd_prefix + \"verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv &\"
 
-        s += "desc \"publish files\"\n"
-        s += "task :publish => [:ip] do\n"
-		s += "\tmkdir_p src_dir\n"
-		s += "\tcmd = \"ln -s \#{home_dir}/rtl \#{src_dir}\"\n"
-		s += "\tputs \"Running CMD> \#{cmd}\"\n"
-		s += "\tsystem(cmd)\n"
-		s += "\tcmd = \"ln -s \#{home_dir}/verif \#{src_dir}\"\n"
-		s += "\tputs \"Running CMD> \#{cmd}\"\n"
-		s += "\tsystem(cmd)\n"
-		s += "\tcmd = \"ln -s \#{home_dir}/ip \#{src_dir}\"\n"
-		s += "\tputs \"Running CMD> \#{cmd}\"\n"
-		s += "\tsystem(cmd)\n"
-		s += "end\n\n"
+task :default => [:run]
 
-		s += "desc \"compile\"\n"
-        s += "task :compile => [:publish] do\n"
-		s += "\tmkdir_p comp_dir\n"
-		s += "\tcmd = \"cd \#{comp_dir}; \#{compile_cmd}\"\n"
-		s += "\tputs \"Running CMD> \#{cmd}\"\n"
-		s += "\tsystem(cmd)\n"
-		s += "end\n\n"
-		
-        s += "desc \"run case\"\n"
-        s += "task :run, [:case] => [:compile] do |t, args|\n"
-		s += "\targs.with_defaults(:case => '#{@name}_base_test')\n"
-		s += "\tcase_dir = sim_dir+\"/\#{args[:case]}\"\n"
-		s += "\tmkdir_p case_dir\n"
-		s += "\tcmd = \"cd \#{case_dir}; \#{sim_cmd} +UVM_TESTNAME=\#{args[:case]}\"\n"
-		s += "\tputs \"Running CMD> \#{cmd}\"\n"
-		s += "\tsystem(cmd)\n"
-		s += "end\n\n"
+desc \"get IP code (if any)\"
+task :ip do
+  cmd = \"git submodule update --init --recursive\"
+  puts \"Running CMD> \#{cmd}\"
+  system(cmd)
+end
 
-	s += "desc \"compile with debug/waveform\"\n"
-        s += "task :compile_debug => [:publish] do\n"
-		s += "\tmkdir_p comp_dir\n"
-		s += "\tcmd = \"cd \#{comp_dir}; \#{compile_cmd} +define+FSDB\"\n"
-		s += "\tputs \"Running CMD> \#{cmd}\"\n"
-		s += "\tsystem(cmd)\n"
-		s += "end\n\n"
-	    
-        s += "desc \"run case with debug/waveform\"\n"
-		s += "task :run_debug, [:case] => [:compile_debug] do |t, args|\n"
-		s += "\targs.with_defaults(:case => '#{@name}_base_test')\n"
-		s += "\tcase_dir = sim_dir+\"/\#{args[:case]}\"\n"
-		s += "\tmkdir_p case_dir\n"
-		s += "\tcmd = \"cd \#{case_dir}; \#{sim_cmd} +UVM_TESTNAME=\#{args[:case]} +UVM_CONFIG_DB_TRACE\"\n"
-		s += "\tputs \"Running CMD> \#{cmd}\"\n"
-		s += "\tsystem(cmd)\n"
-		s += "end\n\n"
+desc \"publish files\"
+task :publish => [:ip] do
+  mkdir_p src_dir
+  cmd = \"ln -s \#{home_dir}/rtl \#{src_dir}\"
+  puts \"Running CMD> \#{cmd}\"
+  system(cmd)
+  cmd = \"ln -s \#{home_dir}/verif \#{src_dir}\"
+  puts \"Running CMD> \#{cmd}\"
+  system(cmd)
+  cmd = \"ln -s \#{home_dir}/ip \#{src_dir}\"
+  puts \"Running CMD> \#{cmd}\"
+  system(cmd)
+end
 
-        s += "desc \"open verdi\"\n"
-		s += "task :verdi do\n"
-		s += "\tmkdir_p sim_dir\n"
-		s += "\tcmd = \"cd \#{sim_dir}; \#{verdi_cmd}\"\n"
-		s += "\tputs \"Running CMD> \#{cmd}\"\n"
-		s += "\tsystem(cmd)\n"
-		s += "end\n\n"
+desc \"compile\"
+task :compile => [:publish] do
+  mkdir_p comp_dir
+  cmd = \"cd \#{comp_dir}; \#{compile_cmd}\"
+  puts \"Running CMD> \#{cmd}\"
+  system(cmd)
+end
+
+desc \"run case\"
+task :run, [:case] => [:compile] do |t, args|
+  args.with_defaults(:case => '#{@name}_base_test')
+  case_dir = sim_dir+\"/\#{args[:case]}\"
+  mkdir_p case_dir
+  cmd = \"cd \#{case_dir}; \#{sim_cmd} +UVM_TESTNAME=\#{args[:case]}\"
+  puts \"Running CMD> \#{cmd}\"
+  system(cmd)
+end
+
+desc \"compile with debug/waveform\"
+task :compile_debug => [:publish] do
+  mkdir_p comp_dir
+  cmd = \"cd \#{comp_dir}; \#{compile_cmd} +define+FSDB\"
+  puts \"Running CMD> \#{cmd}\"
+  system(cmd)
+end
+
+desc \"run case with debug/waveform\"
+task :run_debug, [:case] => [:compile_debug] do |t, args|
+  args.with_defaults(:case => '#{@name}_base_test')
+  case_dir = sim_dir+\"/\#{args[:case]}\"
+  mkdir_p case_dir
+  cmd = \"cd \#{case_dir}; \#{sim_cmd} +UVM_TESTNAME=\#{args[:case]} +UVM_CONFIG_DB_TRACE\"
+  puts \"Running CMD> \#{cmd}\"
+  system(cmd)
+end
+
+desc \"open verdi\"
+task :verdi do
+  mkdir_p sim_dir
+  cmd = \"cd \#{sim_dir}; \#{verdi_cmd}\"
+  puts \"Running CMD> \#{cmd}\"
+  system(cmd)
+end
+		HEREDOC_RAKE
     end
     
 end
