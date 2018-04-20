@@ -705,7 +705,7 @@ def run_cmd(type, dir, command, debug=false)
   cmd = "cd \#{dir}; \#{command}"
   cmd += " +define+FSDB" if debug and type == :compile
   cmd += " +UVM_CONFIG_DB_TRACE" if debug and type == :run
-  puts "Running CMD> \#{cmd}"
+  puts "Running CMD \#{type.to_s.upcase}> \#{cmd}"
   system(cmd)
 end
 
@@ -754,6 +754,12 @@ end
 desc "open verdi"
 task :verdi do
   run_cmd(:verdi, sim_dir, verdi_cmd)
+end
+
+desc "clean output"
+task :clean do
+  clean_cmd = "rm -rf out"
+  run_cmd(:clean, home_dir, clean_cmd)
 end
 		HEREDOC_RAKE
     end
