@@ -667,6 +667,32 @@ endpackage: #{@name}_pkg
     
 end
 
+# UVM generator - suite class
+# This class is used to generate suite file
+class UVM_gen_suite < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = <<-HEREDOC_SUITE
+suite :base
+
+  test :base_test
+    desc    "The base test for all other tests"
+    owner   :smith
+    sanity  true
+    regress true
+    debug   false
+  endtest
+
+endsuite
+ 	HEREDOC_SUITE
+    end
+end
+
+
 # UVM generator - rakefile class
 # This class is used to generate rakefile
 class UVM_gen_rakefile < UVM_gen_file
@@ -700,15 +726,84 @@ sim_cmd = cmd_prefix + "../comp/simv +ntb_random_seed_automatic +UVM_VERBOSITY=U
 
 verdi_cmd = cmd_prefix + "verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv &"
 
-def run_cmd(type, dir, command, debug=false)
+# Methods
+def run_cmd(type, dir, command)
   mkdir_p dir
   cmd = "cd \#{dir}; \#{command}"
-  cmd += " +define+FSDB" if debug and type == :compile
-  cmd += " +UVM_CONFIG_DB_TRACE" if debug and type == :run
   puts "Running CMD \#{type.to_s.upcase}> \#{cmd}"
   system(cmd)
 end
 
+# Testcases
+# class Testcase definition
+class Testcase
+  attr_accessor :name, :suite, :desc, :owner, :sanity, :regress, :debug
+
+  def initialize(name)
+    @name = name
+  end
+end
+
+@test_list = []
+
+@suite_name = nil
+@test_name = nil
+@desc, @owner = nil, nil
+@sanity, @regress, @debug = false, false, false
+
+def suite(name)
+  @suite_name = name
+end
+
+def test(name)
+  @test_name = name
+  @desc, @owner = nil, nil
+  @sanity, @regress, @debug = false, false, false
+end
+
+def desc(content)
+  @desc = content
+end
+
+def owner(name)
+  @owner = name
+end
+
+def sanity(status = false)
+  @sanity = status
+end
+
+def regress(status = false)
+  @regress = status
+end
+
+def debug(status = false)
+  @debug = status
+end
+
+def endtest
+  #initialize
+  t = Testcase.new(@test_name)
+  #set default if not available
+  t.suite = @suite_name || "UNKNOWN"
+  t.desc = @desc || "UNKNOWN"
+  t.owner = @owner || "UNKNOWN"
+  t.sanity = @sanity || false
+  t.regress = @regress || false
+  t.debug = @debug || false
+
+  @test_list << t
+
+  @test_name = nil
+  @desc, @owner = nil, nil
+  @sanity, @regress, @debug = false, false, false
+end
+
+def endsuite
+  @suite_name = nil
+end
+
+# Tasks
 task :default => [:run]
 
 desc "get IP code (if any)"
@@ -732,7 +827,8 @@ end
 
 desc "compile with debug/waveform"
 task :compile_debug => [:publish] do
-  run_cmd(:compile, comp_dir, compile_cmd, true)
+  cmd = compile_cmd + " +define+FSDB"
+  run_cmd(:compile, comp_dir, cmd)
 end
 
 desc "run case"
@@ -748,6 +844,7 @@ task :run_debug, [:case] => [:compile_debug] do |t, args|
   args.with_defaults(:case => '#{@name}_base_test')
   case_dir = sim_dir+"/\#{args[:case]}"
   sim_cmd += " +UVM_TESTNAME=\#{args[:case]}"
+  sim_cmd += " +UVM_CONFIG_DB_TRACE"
   run_cmd(:run, case_dir, sim_cmd, true)
 end
 
@@ -907,6 +1004,10 @@ if __FILE__ == $0
 	puts "making dir: #{out_dir}"
 	Dir.mkdir out_dir if !File::directory?(out_dir)
 
+        # Gen meta files
+        Dir.mkdir out_dir+"/meta" if !File::directory?(out_dir+"/meta")
+        Dir.mkdir out_dir+"/meta/suites" if !File::directory?(out_dir+"/meta/suites")
+
 	# Copy RTL file
 	Dir.mkdir out_dir+"/rtl" if !File::directory?(out_dir+"/rtl")
 	FileUtils.copy options[:mod_file], out_dir+"/rtl"
@@ -916,6 +1017,7 @@ if __FILE__ == $0
 	Dir.mkdir out_dir+"/verif" if !File::directory?(out_dir+"/verif")
 	Dir.mkdir out_dir+"/verif/uvc" if !File::directory?(out_dir+"/verif/uvc")
 	Dir.mkdir out_dir+"/verif/uvc/"+env_name if !File::directory?(out_dir+"/verif/uvc/"+env_name)
+
     # Gen the interface
     intf = UVM_gen_if.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_if.sv", port_list)
     intf.to_f
@@ -971,6 +1073,10 @@ if __FILE__ == $0
 
 	# IP dir
 	Dir.mkdir out_dir+"/ip" if !File::directory?(out_dir+"/ip")
+
+    # Gen the suite file
+    suite = UVM_gen_suite.new(env_name, out_dir+"/meta/suites/base.rb")
+    suite.to_f
 
     # Gen the rakefile
     rakefile = UVM_gen_rakefile.new(env_name, out_dir+"/rakefile")
