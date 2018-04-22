@@ -679,7 +679,7 @@ class UVM_gen_suite < UVM_gen_file
         s = <<-HEREDOC_SUITE
 suite :base
 
-  test :base_test
+  test :#{@name}_base_test
     desc    "The base test for all other tests"
     owner   :smith
     sanity  true
@@ -751,6 +751,16 @@ end
 @desc, @owner = nil, nil
 @sanity, @regress, @debug = false, false, false
 
+def gen_test_list
+  @test_list = []
+  suite_list = FileList["meta/suites/*.rb"]
+  suite_list.each do |suite_f|
+    path = File.dirname(suite_f) + "/" + 
+	  File.basename(suite_f, File.extname(suite_f))
+    require_relative path
+  end
+end
+
 def suite(name)
   @suite_name = name
 end
@@ -803,6 +813,7 @@ def endsuite
   @suite_name = nil
 end
 
+
 # Tasks
 task :default => [:run]
 
@@ -846,6 +857,22 @@ task :run_debug, [:case] => [:compile_debug] do |t, args|
   sim_cmd += " +UVM_TESTNAME=\#{args[:case]}"
   sim_cmd += " +UVM_CONFIG_DB_TRACE"
   run_cmd(:run, case_dir, sim_cmd, true)
+end
+
+desc "run sanity"
+task :sanity do
+  gen_test_list
+  @test_list.each do |t|
+	Rake::Task[:run].invoke(t.name) if (t.sanity && !t.debug)
+  end
+end
+
+desc "run regression"
+task :regress do
+  gen_test_list
+  @test_list.each do |t|
+	Rake::Task[:run].invoke(t.name) if (t.sanity && !t.debug)
+  end
 end
 
 desc "open verdi"

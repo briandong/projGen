@@ -41,17 +41,21 @@ In this section we explore the generated sample project.
 
 To get the available task list, just change to sample project directory and type:
 
-> rake --tasks
+> rake -T
 
 Normally the task list looks like:
 
 ```
-rake compile         # compile
-rake ip              # get IP code (if any)
-rake publish         # publish files
-rake run[case]       # run case
-rake run_fsdb[case]  # run case with waveform
-rake verdi           # open verdi
+rake clean            # clean output
+rake compile          # compile
+rake compile_debug    # compile with debug/waveform
+rake ip               # get IP code (if any)
+rake publish          # publish files
+rake regress          # run regression
+rake run[case]        # run case
+rake run_debug[case]  # run case with debug/waveform
+rake sanity           # run sanity
+rake verdi            # open verdi
 ```
 
 Pay attention to task
@@ -67,7 +71,7 @@ IPs are developed as separate projects and organized as nested submodules in thi
 Note that the tasks above have dependency relationship as:
 
 ```
-ip <= publish <= compile <= run/run_fsdb
+ip <= publish <= compile <= run
 ```
 
 It means higher dependency tasks (right ones) rely on lower dependency tasks (left ones), and will automatically execute dependent tasks if necessary.
@@ -86,6 +90,9 @@ Before running any tasks, the original clean project file structure is:
 
 ```
 ▾ ip/
+▾ meta/
+  ▾ suites/
+      base.rb
 ▾ rtl/
     sample.v
 ▾ verif/
@@ -116,6 +123,7 @@ is:
 
 ```
 ▸ ip/
+▸ meta/
 ▾ out/
   ▾ src/
     ▾ ip/
@@ -136,6 +144,7 @@ A simulation snapshot will be created in 'out/sim/comp' directory for simulation
 
 ```
 ▸ ip/
+▸ meta/
 ▾ out/
   ▾ sim/
     ▾ comp/
@@ -157,12 +166,13 @@ Execute
 > rake run[CASE_NAME]
 
 or 
-> rake run_fsdb[CASE_NAME]
+> rake run_debug[CASE_NAME]
 
 for case simulation w.o/w. waveform. The sim log and waveform are stored in directory 'out/sim/CASE_NAME':
 
 ```
 ▸ ip/
+▸ meta/
 ▾ out/
   ▾ sim/
     ▸ comp/
@@ -183,6 +193,59 @@ for case simulation w.o/w. waveform. The sim log and waveform are stored in dire
 To open a verdi session for debug, just type:
 
 > rake verdi
+
+#### Suites and tests
+
+All the suite and test information is defined under directory 'meta/suites'.
+
+The tests in the same suite are included in one suite file. Let us take a look at 'base' suite ('meta/suites/base.rb') for example:
+
+```ruby
+suite :base
+
+  test :sample_base_test
+    desc    "The base test for all other tests"
+    owner   :smith
+    sanity  true
+    regress true
+    debug   false
+  endtest
+
+endsuite
+```
+
+Every test contains the following information: 
+
+| Item    | Description                                                 |
+| ------- | ----------------------------------------------------------- |
+| test    | name of test, in symbol (a string starting with ':')        |
+| desc    | description                                                 |
+| owner   | owner, in symbol                                            |
+| sanity  | indicates the test belongs to sanity (false by default)     |
+| regress | indicates the test belongs to regression (false by default) |
+| debug   | indicates the test is in debugging (false by default)       |
+
+*Note: The suites are described in DSL (Domain Specific Language).*
+
+#### Sanity
+
+Kick off the simulation for sanity tests (not including those ones in debug)
+
+> rake sanity
+
+#### Regression
+
+Kick off the simulation for regression tests (not including those ones in debug)
+
+> rake regress
+
+#### Clean
+
+To remove  'out' directory, execute:
+
+> rake clean
+
+
 
 
 
