@@ -703,14 +703,15 @@ class UVM_gen_rakefile < UVM_gen_file
     
     def to_s
 		s = <<-HEREDOC_RAKE
-home_dir = Dir.pwd
-out_dir  = home_dir+"/out"
-src_dir  = out_dir+"/src"
-ip_dir   = src_dir+"/ip"
-rtl_dir  = src_dir+"/rtl"
-ver_dir  = src_dir+"/verif"
-sim_dir  = out_dir+"/sim"
-comp_dir = sim_dir+"/comp"
+home_dir   = Dir.pwd
+out_dir    = home_dir+"/out"
+src_dir    = out_dir+"/src"
+ip_dir     = src_dir+"/ip"
+design_dir = src_dir+"/design"
+rtl_dir    = design_dir+"/rtl"
+ver_dir    = src_dir+"/verif"
+sim_dir    = out_dir+"/sim"
+comp_dir   = sim_dir+"/comp"
 
 incdir_list = "+incdir+\#{rtl_dir} +incdir+\#{ver_dir}/tb +incdir+\#{ver_dir}/uvc/#{@name}"
 incdir_list += " +incdir+$UVM_HOME/src $UVM_HOME/src/uvm.sv $UVM_HOME/src/dpi/uvm_dpi.cc"
@@ -728,7 +729,7 @@ verdi_cmd = cmd_prefix + "verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}
 
 # Methods
 def run_cmd(type, dir, command)
-  mkdir_p dir
+  mkdir_p dir if !File::directory?(dir)
   cmd = "cd \#{dir}; \#{command}"
   puts "Running CMD \#{type.to_s.upcase}> \#{cmd}"
   system(cmd)
@@ -825,7 +826,7 @@ end
 
 desc "publish files"
 task :publish => [:ip] do
-  cmd = "ln -s \#{home_dir}/rtl \#{src_dir};"
+  cmd = "ln -s \#{home_dir}/design \#{src_dir};"
   cmd += "ln -s \#{home_dir}/verif \#{src_dir};"
   cmd += "ln -s \#{home_dir}/ip \#{src_dir}"
   run_cmd(:publish, src_dir, cmd)
@@ -1031,14 +1032,13 @@ if __FILE__ == $0
 	puts "making dir: #{out_dir}"
 	Dir.mkdir out_dir if !File::directory?(out_dir)
 
-        # Gen meta files
-        Dir.mkdir out_dir+"/meta" if !File::directory?(out_dir+"/meta")
-        Dir.mkdir out_dir+"/meta/suites" if !File::directory?(out_dir+"/meta/suites")
+    # Gen meta files
+	FileUtils.mkdir_p out_dir+"/meta/suites" if !File::directory?(out_dir+"/meta/suites")
 
 	# Copy RTL file
-	Dir.mkdir out_dir+"/rtl" if !File::directory?(out_dir+"/rtl")
-	FileUtils.copy options[:mod_file], out_dir+"/rtl"
-	puts "Copying RTL file to: #{out_dir}/rtl"
+	FileUtils.mkdir_p out_dir+"/design/rtl" if !File::directory?(out_dir+"/design/rtl")
+	FileUtils.copy options[:mod_file], out_dir+"/design/rtl"
+	puts "Copying RTL file to: #{out_dir}/design/rtl"
 	
 	# Gen UVC files
 	Dir.mkdir out_dir+"/verif" if !File::directory?(out_dir+"/verif")

@@ -93,8 +93,9 @@ Before running any tasks, the original clean project file structure is:
 ▾ meta/
   ▾ suites/
       base.rb
-▾ rtl/
-    sample.v
+▾ design/
+  ▾ rtl/
+      sample.v
 ▾ verif/
   ▾ tb/
       sample_tb_top.sv
@@ -127,9 +128,9 @@ is:
 ▾ out/
   ▾ src/
     ▾ ip/
-    ▸ rtl/
+    ▸ design/
     ▸ verif/
-▸ rtl/
+▸ design/
 ▸ verif/
   rakefile
 ```
@@ -154,7 +155,7 @@ A simulation snapshot will be created in 'out/sim/comp' directory for simulation
         ▸ worklib/
         irun_comp_sample.log
   ▸ src/
-▸ rtl/
+▸ design/
 ▸ verif/
   rakefile
 ```
@@ -181,7 +182,7 @@ for case simulation w.o/w. waveform. The sim log and waveform are stored in dire
         novas_dump.log
         wave.fsdb
   ▸ src/
-▸ rtl/
+▸ design/
 ▸ verif/
   rakefile
 ```
