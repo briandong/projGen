@@ -730,9 +730,9 @@ verdi_cmd = cmd_prefix + "verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}
 # Methods
 def run_cmd(type, dir, command)
   mkdir_p dir if !File::directory?(dir)
-  cmd = "cd \#{dir}; \#{command}"
+  cmd = "cd \#{dir} && \#{command}"
   puts "Running CMD \#{type.to_s.upcase}> \#{cmd}"
-  system(cmd)
+  sh(cmd)
 end
 
 # Testcases
@@ -826,8 +826,8 @@ end
 
 desc "publish files"
 task :publish => [:ip] do
-  cmd = "ln -s \#{home_dir}/design \#{src_dir};"
-  cmd += "ln -s \#{home_dir}/verif \#{src_dir};"
+  cmd = "ln -s \#{home_dir}/design \#{src_dir} &&"
+  cmd += "ln -s \#{home_dir}/verif \#{src_dir} &&"
   cmd += "ln -s \#{home_dir}/ip \#{src_dir}"
   run_cmd(:publish, src_dir, cmd)
 end
