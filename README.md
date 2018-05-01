@@ -12,7 +12,9 @@ To get help on this program:
 
 > ./proj_gen.rb -h
 
-Usage: ./proj_gen.rb -n PROJ_NAME -f MODULE_FILE [-t TOP_MODULE] -o OUTPUT_DIR
+Usage:   ./proj_gen.rb -n PROJ_NAME -f MODULE_FILE [-t TOP_MODULE] -o OUTPUT_DIR
+Example: ./proj_gen.rb -n sample -f sample.v -o ./sampleProj
+
 * -n, --name PROJ_NAME        Specify the project name
 * -f, --file MODULE_FILE         Specify the module file
 * -t, --top TOP_MODULE         Specify the top module (optional)

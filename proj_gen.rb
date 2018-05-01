@@ -122,7 +122,7 @@ class #{@name}_item extends uvm_sequence_item;
   `uvm_object_utils_end\n\n" 
 
   // Constructor
-  function new (string name = \"#{@name}_item\");
+  function new (string name = "#{@name}_item");
     super.new(name);
   endfunction: new
 
@@ -151,16 +151,16 @@ class #{@name}_driver extends uvm_driver #(#{@name}_item);
   `uvm_component_utils(#{@name}_driver)
 
   // Constructor
-  function new (string name = \"#{@name}_driver\", uvm_component parent);
+  function new (string name = "#{@name}_driver", uvm_component parent);
     super.new(name, parent);
   endfunction: new
 
   function void build_phase(uvm_phase phase);
     string inst_name;
     super.build_phase(phase);
-    if (!uvm_config_db#(virtual #{@name}_if)::get(this,\"\",\"vif\",vif))
-      `uvm_fatal(\"NOVIF\", {\"virtual interface must be set for: \",
-      get_full_name(),\".vif\"});
+    if (!uvm_config_db#(virtual #{@name}_if)::get(this,"","vif",vif))
+      `uvm_fatal("NOVIF", {"virtual interface must be set for: ",
+      get_full_name(),".vif"});
   endfunction: build_phase
 
   virtual task run_phase(uvm_phase phase);
@@ -175,7 +175,7 @@ class #{@name}_driver extends uvm_driver #(#{@name}_item);
 
   virtual task drive_item (input #{@name}_item item);
     // Add your logic here.
-    `uvm_info(get_type_name(), \"driving item\", UVM_LOW)
+    `uvm_info(get_type_name(), "driving item", UVM_LOW)
 
     fork
       begin
@@ -227,20 +227,20 @@ class #{@name}_monitor extends uvm_monitor;
   endgroup: cov_trans
 
   // Constructor
-  function new (string name = \"#{@name}_monitor\", uvm_component parent);
+  function new (string name = "#{@name}_monitor", uvm_component parent);
     super.new(name, parent);
       cov_trans = new();
-      cov_trans.set_inst_name({get_full_name(), \".cov_trans\"});
+      cov_trans.set_inst_name({get_full_name(), ".cov_trans"});
       trans_collected = new();
-      item_collected_port = new(\"item_collected_port\", this);
+      item_collected_port = new("item_collected_port", this);
   endfunction: new
 
   function void build_phase(uvm_phase phase);
     string inst_name;
     super.build_phase(phase);
-    if (!uvm_config_db#(virtual #{@name}_if)::get(this,\"\",\"vif\",vif))
-      `uvm_fatal(\"NOVIF\", {\"virtual interface must be set for: \",
-      get_full_name(),\".vif\"});
+    if (!uvm_config_db#(virtual #{@name}_if)::get(this,"","vif",vif))
+      `uvm_fatal("NOVIF", {"virtual interface must be set for: ",
+      get_full_name(),".vif"});
   endfunction: build_phase
 
   virtual task run_phase(uvm_phase phase);
@@ -331,12 +331,12 @@ class #{@name}_agent extends uvm_agent;
   // Use build_phase to create agents's subcomponents
   virtual function void build_phase(uvm_phase phase);
     super.build_phase(phase);
-    monitor = #{@name}_monitor::type_id::create(\"monitor\",this);
+    monitor = #{@name}_monitor::type_id::create("monitor",this);
     if (is_active == UVM_ACTIVE) begin
       // Build the sequencer and driver
       sequencer =
-      uvm_sequencer#(#{@name}_item)::type_id::create(\"sequencer\",this);
-      driver = #{@name}_driver::type_id::create(\"driver\",this);
+      uvm_sequencer#(#{@name}_item)::type_id::create("sequencer",this);
+      driver = #{@name}_driver::type_id::create("driver",this);
     end
   endfunction: build_phase
 
@@ -381,7 +381,7 @@ class #{@name}_scoreboard extends uvm_scoreboard;
 
   // build_phase
   function void build_phase(uvm_phase phase);
-    item_collected_export = new(\"item_collected_export\", this);
+    item_collected_export = new("item_collected_export", this);
   endfunction
 
   // Provide implementation of write()
@@ -425,23 +425,23 @@ class #{@name}_env extends uvm_env;
     string inst_name;
     super.build_phase(phase);
 
-    if(!uvm_config_db#(virtual #{@name}_if)::get(this, \"\", \"vif\", vif))
-      `uvm_fatal(\"NOVIF\",{\"virtual interface must be set for: \",get_full_name(),\".vif\"});
+    if(!uvm_config_db#(virtual #{@name}_if)::get(this, "", "vif", vif))
+      `uvm_fatal("NOVIF",{"virtual interface must be set for: ",get_full_name(),".vif"});
 
     if(num_masters ==0)
-      `uvm_fatal(\"NONUM\",{\"'num_masters' must be set for: \", get_full_name()});
+      `uvm_fatal("NONUM",{"'num_masters' must be set for: ", get_full_name()});
 
     //uvm_config_db#(uvm_active_passive_enum)::set(this,
     uvm_config_db#(int)::set(this,
-      \"masters*\", \"is_active\", UVM_ACTIVE);
+      "masters*", "is_active", UVM_ACTIVE);
 
     masters = new[num_masters];
     for(int i = 0; i < num_masters; i++) begin
-      $sformat(inst_name, \"masters[%0d]\", i);
+      $sformat(inst_name, "masters[%0d]", i);
       masters[i] = #{@name}_agent::type_id::create(inst_name, this);
     end
 
-    scoreboard0 = #{@name}_scoreboard::type_id::create(\"scoreboard0\", this);
+    scoreboard0 = #{@name}_scoreboard::type_id::create("scoreboard0", this);
 
     // Build slaves and other components
 
@@ -479,9 +479,9 @@ class #{@name}_base_test extends uvm_test;
   `uvm_component_utils(#{@name}_base_test)
 
   #{@name}_env #{@name}_env0;
-  #
+
   // The test’s constructor
-  function new (string name = \"#{@name}_base_test\",
+  function new (string name = "#{@name}_base_test",
     uvm_component parent = null);
     super.new(name, parent);
   endfunction
@@ -493,15 +493,15 @@ class #{@name}_base_test extends uvm_test;
     // will create the top-level environment and all its subcomponents
     //Therefore, any configuration that will affect the building
     // of these components must be set before calling super.build_phase()
-    uvm_config_db#(int)::set(this,\"#{@name}_env0\", \"num_masters\", 1);
+    uvm_config_db#(int)::set(this,"#{@name}_env0", "num_masters", <%= num_of_masters %>);
     super.build_phase(phase);
     #{@name}_env0 =
-      #{@name}_env::type_id::create(\"#{@name}_env0\", this);
+      #{@name}_env::type_id::create("#{@name}_env0", this);
     //Since the sequences don’t get started until a later phase,
     // they could be called after super.build_phase()
     uvm_config_db#(uvm_object_wrapper)::
-      set(this, \"#{@name}_env0.masters[0].sequencer.run_phase\",
-      \"default_sequence\", #{@name}_base_seq::type_id::get());
+      set(this, "#{@name}_env0.masters[0].sequencer.run_phase",
+      "default_sequence", #{@name}_base_seq::type_id::get());
   endfunction
 
   function void end_of_elaboration_phase(uvm_phase phase);
@@ -540,12 +540,12 @@ class #{@name}_base_seq extends uvm_sequence #(#{@name}_item);
   `uvm_object_utils_end
 
   // The sequence’s constructor
-  function new (string name = \"#{@name}_base_seq\");
+  function new (string name = "#{@name}_base_seq");
     super.new(name);
   endfunction
 
   virtual task body();
-    `uvm_info(get_type_name(), $psprintf(\"has %0d item(s)\", count), UVM_LOW)
+    `uvm_info(get_type_name(), $psprintf("has %0d item(s)", count), UVM_LOW)
     repeat (count)
       `uvm_do(req)
   endtask
@@ -580,10 +580,10 @@ class UVM_gen_tb_top < UVM_gen_file
     
     def to_s
         s = <<-HEREDOC_TOP
-`include \"#{@name}_pkg.sv\"
-`include \"#{@name}_if.sv\"
+`include "#{@name}_pkg.sv"
+`include "#{@name}_if.sv"
 
-`include \"#{@dut_file}\"
+`include "#{@dut_file}"
 
 module #{@name}_tb_top;
 
@@ -607,8 +607,8 @@ module #{@name}_tb_top;
 
   initial begin
     //automatic uvm_coreservice_t cs_ = uvm_coreservice_t::get();
-    //uvm_config_db#(virtual #{@name}_if)::set(cs_.get_root(), \"*\", \"vif\", vif);
-    uvm_config_db#(virtual #{@name}_if)::set(null, \"*.#{@name}_env0*\", \"vif\", vif);
+    //uvm_config_db#(virtual #{@name}_if)::set(cs_.get_root(), "*", "vif", vif);
+    uvm_config_db#(virtual #{@name}_if)::set(null, "*.#{@name}_env0*", "vif", vif);
     run_test();
   end
 
@@ -625,7 +625,7 @@ module #{@name}_tb_top;
   //dump fsdb
   `ifdef FSDB
   initial begin
- 	  $fsdbDumpfile(\"novas.fsdb\");
+ 	  $fsdbDumpfile("novas.fsdb");
     $fsdbDumpvars(0, #{@name}_tb_top);
     $fsdbDumpflush;
   end
@@ -651,16 +651,16 @@ class UVM_gen_pkg < UVM_gen_file
 package #{@name}_pkg;
 
   import uvm_pkg::*;
-  `include \"uvm_macros.svh\"
+  `include "uvm_macros.svh"
 
-  `include \"#{@name}_item.sv\"
-  `include \"#{@name}_drv.sv\"
-  `include \"#{@name}_mon.sv\"
-  `include \"#{@name}_agent.sv\"
-  `include \"#{@name}_scoreboard.sv\"
-  `include \"#{@name}_env.sv\"
-  `include \"#{@name}_seq_lib.sv\"
-  `include \"#{@name}_test_lib.sv\"
+  `include "#{@name}_item.sv"
+  `include "#{@name}_drv.sv"
+  `include "#{@name}_mon.sv"
+  `include "#{@name}_agent.sv"
+  `include "#{@name}_scoreboard.sv"
+  `include "#{@name}_env.sv"
+  `include "#{@name}_seq_lib.sv"
+  `include "#{@name}_test_lib.sv"
 endpackage: #{@name}_pkg
 		HEREDOC_PKG
     end
@@ -692,6 +692,20 @@ endsuite
     end
 end
 
+# UVM generator - family class
+# This class is used to generate family file
+class UVM_gen_family < UVM_gen_file
+
+    def initialize(name, file)
+        super(name, file)
+    end
+    
+    def to_s
+        s = <<-HEREDOC_FAMILY
+num_of_masters = 1
+ 	HEREDOC_FAMILY
+    end
+end
 
 # UVM generator - rakefile class
 # This class is used to generate rakefile
@@ -733,6 +747,22 @@ def run_cmd(type, dir, command)
   cmd = "cd \#{dir} && \#{command}"
   puts "Running CMD \#{type.to_s.upcase}> \#{cmd}"
   sh(cmd)
+end
+
+def run_pub(dir, set_file)
+  puts "Publishing \#{dir} with \#{set_file}..."
+
+  settings = ""
+  File::open(set_file).each do |l|
+	settings << l.strip.gsub(/\s/,'') #remove white spaces
+  end
+
+  Dir["\#{dir}/**/*.erb"].each do |f|
+    f_target = File.dirname(f)+"/"+File.basename(f, File.extname(f))
+    cmd = "erb \#{settings} \#{f} > \#{f_target}"
+    sh(cmd)
+    puts "Parsing \#{f} => \#{f_target}"
+  end
 end
 
 # Testcases
@@ -825,11 +855,14 @@ task :ip do
 end
 
 desc "publish files"
-task :publish => [:ip] do
+task :publish, [:family] => [:ip] do |t, args|
+  args.with_defaults(:family => :base)
   cmd = "ln -s \#{home_dir}/design \#{src_dir} &&"
   cmd += "ln -s \#{home_dir}/verif \#{src_dir} &&"
   cmd += "ln -s \#{home_dir}/ip \#{src_dir}"
   run_cmd(:publish, src_dir, cmd)
+  run_pub("\#{src_dir}/design", "meta/family/\#{args[:family].to_s}.rb")
+  run_pub("\#{src_dir}/verif", "meta/family/\#{args[:family].to_s}.rb")
 end
 
 desc "compile"
@@ -845,19 +878,19 @@ end
 
 desc "run case"
 task :run, [:case] => [:compile] do |t, args|
-  args.with_defaults(:case => '#{@name}_base_test')
-  case_dir = sim_dir+"/\#{args[:case]}"
-  sim_cmd += " +UVM_TESTNAME=\#{args[:case]}"
+  args.with_defaults(:case => :#{@name}_base_test)
+  case_dir = sim_dir+"/\#{args[:case].to_s}"
+  sim_cmd += " +UVM_TESTNAME=\#{args[:case].to_s}"
   run_cmd(:run, case_dir, sim_cmd)
 end
 
 desc "run case with debug/waveform"
 task :run_debug, [:case] => [:compile_debug] do |t, args|
-  args.with_defaults(:case => '#{@name}_base_test')
-  case_dir = sim_dir+"/\#{args[:case]}"
-  sim_cmd += " +UVM_TESTNAME=\#{args[:case]}"
+  args.with_defaults(:case => :#{@name}_base_test)
+  case_dir = sim_dir+"/\#{args[:case].to_s}"
+  sim_cmd += " +UVM_TESTNAME=\#{args[:case].to_s}"
   sim_cmd += " +UVM_CONFIG_DB_TRACE"
-  run_cmd(:run, case_dir, sim_cmd, true)
+  run_cmd(:run, case_dir, sim_cmd)
 end
 
 desc "run sanity"
@@ -901,7 +934,8 @@ if __FILE__ == $0
 
     optparse = OptionParser.new do |opts|
         # Set a banner displayed at the top of the help screen
-        opts.banner = "Usage: ./proj_gen.rb -n PROJ_NAME -f MODULE_FILE [-t TOP_MODULE] -o OUTPUT_DIR"
+        opts.banner = "Usage:   ./proj_gen.rb -n PROJ_NAME -f MODULE_FILE [-t TOP_MODULE] -o OUTPUT_DIR\n"
+		opts.banner += "Example: ./proj_gen.rb -n sample -f sample.v -o ./sampleProj"
     
         # Define the env name
         options[:env_name] = nil
@@ -1034,6 +1068,7 @@ if __FILE__ == $0
 
     # Gen meta files
 	FileUtils.mkdir_p out_dir+"/meta/suites" if !File::directory?(out_dir+"/meta/suites")
+	FileUtils.mkdir_p out_dir+"/meta/family" if !File::directory?(out_dir+"/meta/family")
 
 	# Copy RTL file
 	FileUtils.mkdir_p out_dir+"/design/rtl" if !File::directory?(out_dir+"/design/rtl")
@@ -1078,7 +1113,7 @@ if __FILE__ == $0
 	env.to_f
     
     # Gen the test lib
-    test = UVM_gen_test.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_test_lib.sv")
+	test = UVM_gen_test.new(env_name, out_dir+"/verif/uvc/"+env_name+"/"+env_name+"_test_lib.sv.erb")
 	test.to_f
 
     # Gen the seq lib
@@ -1103,6 +1138,10 @@ if __FILE__ == $0
 
     # Gen the suite file
     suite = UVM_gen_suite.new(env_name, out_dir+"/meta/suites/base.rb")
+    suite.to_f
+
+    # Gen the suite file
+    suite = UVM_gen_family.new(env_name, out_dir+"/meta/family/base.rb")
     suite.to_f
 
     # Gen the rakefile
