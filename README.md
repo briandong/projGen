@@ -39,53 +39,6 @@ Could omit top module if "sample" is the 1st module defined in RTL file "sample.
 
 In this section we explore the generated sample project.
 
-### Tasks Available
-
-To get the available task list, just change to sample project directory and type:
-
-> rake -T
-
-Normally the task list looks like:
-
-```
-rake clean            # clean output
-rake compile          # compile
-rake compile_debug    # compile with debug/waveform
-rake ip               # get IP code (if any)
-rake publish          # publish files
-rake regress          # run regression
-rake run[case]        # run case
-rake run_debug[case]  # run case with debug/waveform
-rake sanity           # run sanity
-rake verdi            # open verdi
-```
-
-Pay attention to task
-
-> rake ip
-
-IPs are developed as separate projects and organized as nested submodules in this sample project.
-
-**Benefit:** a centralized IP is much easier to maintain than the the same IP scattered in different projects with different versions.
-
-### Dependency
-
-Note that the tasks above have dependency relationship as:
-
-```
-ip <= publish <= compile <= run
-```
-
-It means higher dependency tasks (right ones) rely on lower dependency tasks (left ones), and will automatically execute dependent tasks if necessary.
-
-For example, if you execute
-
-> rake run
-
-from scratch, it will automatically run tasks 'ip', 'publish', and 'compile' before that.
-
-**Benefit:** program takes care of all the underlying dependency issues so that user only needs to focus on target task.
-
 ### Flow and File Structure
 
 Before running any tasks, the original clean project file structure is:
@@ -93,6 +46,8 @@ Before running any tasks, the original clean project file structure is:
 ```
 ▾ ip/
 ▾ meta/
+  ▾ family/
+      base.rb
   ▾ suites/
       base.rb
 ▾ design/
@@ -112,90 +67,15 @@ Before running any tasks, the original clean project file structure is:
         sample_pkg.sv
         sample_scoreboard.sv
         sample_seq_lib.sv
-        sample_test_lib.sv
+        sample_test_lib.sv.erb
   rakefile
 ```
 
-#### Publish
+### Meta files
 
-All the code is published to 'out/src' directory before use (compile/run). So the project file structure after 
+#### Family
 
-> rake publish
-
-is:
-
-```
-▸ ip/
-▸ meta/
-▾ out/
-  ▾ src/
-    ▾ ip/
-    ▸ design/
-    ▸ verif/
-▸ design/
-▸ verif/
-  rakefile
-```
-
-**Benefit:** better flexibility and neater source code control.
-
-#### Compile
-
-A simulation snapshot will be created in 'out/sim/comp' directory for simulation of multiple cases,  after 
-
-> rake compile
-
-```
-▸ ip/
-▸ meta/
-▾ out/
-  ▾ sim/
-    ▾ comp/
-      ▾ INCA_libs/
-        ▸ irun.lnx8664.14.20.nc/
-        ▸ irun.nc/
-        ▸ worklib/
-        irun_comp_sample.log
-  ▸ src/
-▸ design/
-▸ verif/
-  rakefile
-```
-
-#### Simulate
-
-Execute 
-
-> rake run[CASE_NAME]
-
-or 
-> rake run_debug[CASE_NAME]
-
-for case simulation w.o/w. waveform. The sim log and waveform are stored in directory 'out/sim/CASE_NAME':
-
-```
-▸ ip/
-▸ meta/
-▾ out/
-  ▾ sim/
-    ▸ comp/
-    ▾ sample_base_test/
-        irun.log
-        novas_dump.log
-        wave.fsdb
-  ▸ src/
-▸ design/
-▸ verif/
-  rakefile
-```
-
-**Benefit:** multiple cases can run simultaneously based on the same snapshot to improve the simulation efficiency.
-
-#### Debug
-
-To open a verdi session for debug, just type:
-
-> rake verdi
+Family meta files are utilized to define different variants of current project, under directory 'meta/family'.
 
 #### Suites and tests
 
@@ -230,19 +110,149 @@ Every test contains the following information:
 
 *Note: The suites are described in DSL (Domain Specific Language).*
 
-#### Sanity
+### Tasks Available
+
+To get the full available task list, just change to sample project directory and type:
+
+> rake -T
+
+Normally the task list looks like:
+
+```
+rake clean            # clean output
+rake compile          # compile
+rake compile_debug    # compile with debug/waveform
+rake ip               # get IP code (if any)
+rake publish[family]  # publish files
+rake regress          # run regression
+rake run[case]        # run case
+rake run_debug[case]  # run case with debug/waveform
+rake sanity           # run sanity
+rake verdi            # open verdi
+```
+
+#### Dependency
+
+Note that the tasks above have dependency relationship as:
+
+```
+ip <= publish <= compile <= run
+```
+
+It means higher dependency tasks (right ones) rely on lower dependency tasks (left ones), and will automatically execute dependent tasks if necessary.
+
+For example, if you execute
+
+> rake run
+
+from scratch, it will automatically run tasks 'ip', 'publish', and 'compile' before that.
+
+**Benefit:** program takes care of all the underlying dependency issues so that user only needs to focus on target task.
+
+#### ip
+
+Pay attention to task
+
+> rake ip
+
+IPs are developed as separate projects and organized as nested submodules in this sample project.
+
+**Benefit:** a centralized IP is much easier to maintain than the the same IP scattered in different projects with different versions.
+
+#### publish
+
+All the code is published to 'out/src' directory before use (compile/run). So the project file structure after 
+
+> rake publish
+
+is:
+
+```
+▸ ip/
+▸ meta/
+▾ out/
+  ▾ src/
+    ▾ ip/
+    ▸ design/
+    ▸ verif/
+▸ design/
+▸ verif/
+  rakefile
+```
+
+**Benefit:** better flexibility and neater source code control.
+
+#### compile
+
+A simulation snapshot will be created in 'out/sim/comp' directory for simulation of multiple cases,  after 
+
+> rake compile
+
+```
+▸ ip/
+▸ meta/
+▾ out/
+  ▾ sim/
+    ▾ comp/
+      ▾ INCA_libs/
+        ▸ irun.lnx8664.14.20.nc/
+        ▸ irun.nc/
+        ▸ worklib/
+        irun_comp_sample.log
+  ▸ src/
+▸ design/
+▸ verif/
+  rakefile
+```
+
+#### simulate
+
+Execute 
+
+> rake run[CASE_NAME]
+
+or 
+> rake run_debug[CASE_NAME]
+
+for case simulation w.o/w. waveform. The sim log and waveform are stored in directory 'out/sim/CASE_NAME':
+
+```
+▸ ip/
+▸ meta/
+▾ out/
+  ▾ sim/
+    ▸ comp/
+    ▾ sample_base_test/
+        irun.log
+        novas_dump.log
+        wave.fsdb
+  ▸ src/
+▸ design/
+▸ verif/
+  rakefile
+```
+
+**Benefit:** multiple cases can run simultaneously based on the same snapshot to improve the simulation efficiency.
+
+#### verdi
+
+To open a verdi session for debug, just type:
+
+> rake verdi
+
+#### sanity
 
 Kick off the simulation for sanity tests (not including those ones in debug)
 
 > rake sanity
 
-#### Regression
+#### regression
 
 Kick off the simulation for regression tests (not including those ones in debug)
 
 > rake regress
 
-#### Clean
+#### clean
 
 To remove  'out' directory, execute:
 
