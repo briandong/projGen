@@ -759,9 +759,9 @@ def run_pub(dir, set_file)
 
   Dir["\#{dir}/**/*.erb"].each do |f|
     f_target = File.dirname(f)+"/"+File.basename(f, File.extname(f))
-    cmd = "erb \#{settings} \#{f} > \#{f_target}"
-    sh(cmd)
+    cmd = "erb \#{settings} \#{f} > \#{f_target} && rm \#{f}"
     puts "Parsing \#{f} => \#{f_target}"
+    sh(cmd)
   end
 end
 
@@ -861,8 +861,8 @@ task :publish, [:family] => [:ip] do |t, args|
   cmd += "ln -s \#{home_dir}/verif \#{src_dir} &&"
   cmd += "ln -s \#{home_dir}/ip \#{src_dir}"
   run_cmd(:publish, src_dir, cmd)
-  run_pub("\#{src_dir}/design", "meta/family/\#{args[:family].to_s}.rb")
-  run_pub("\#{src_dir}/verif", "meta/family/\#{args[:family].to_s}.rb")
+  run_pub("\#{src_dir}/design", "meta/family/\#{args[:family].to_s}.cfg")
+  run_pub("\#{src_dir}/verif", "meta/family/\#{args[:family].to_s}.cfg")
 end
 
 desc "compile"
@@ -1141,7 +1141,7 @@ if __FILE__ == $0
     suite.to_f
 
     # Gen the suite file
-    suite = UVM_gen_family.new(env_name, out_dir+"/meta/family/base.rb")
+    suite = UVM_gen_family.new(env_name, out_dir+"/meta/family/base.cfg")
     suite.to_f
 
     # Gen the rakefile

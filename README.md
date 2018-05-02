@@ -46,7 +46,7 @@ Before running any tasks, the original clean project file structure is:
 ▾ ip/
 ▾ meta/
   ▾ family/
-      base.info
+      base.cfg
   ▾ suites/
       base.rb
 ▾ design/
@@ -76,7 +76,7 @@ Before running any tasks, the original clean project file structure is:
 
 The sample project supports family of different variants. 
 
-Variant variables are defined in family meta files ('meta/family/*.info'), and utilized by task publish.
+Variant variables are defined in family meta files ('meta/family/*.cfg'), and utilized by task publish. See section publish[family] for details.
 
 #### suites (and tests)
 
@@ -181,7 +181,29 @@ is:
   rakefile
 ```
 
-Note that sample project pareses files with extention .erb using specified family meta file (default is :base).
+Note that you can specify the family meta file when parsing the files under 'out/src/design' &  'out/src/verif' with extention .erb.
+
+If the family option is omitted in publish just as above, a default family option :base is used, the same as
+
+> rake publish[:base]
+
+Then the sample project parses for instance this line in 'out/src/verif/uvc/sample/sample_test_lib.sv.erb':
+
+```verilog
+uvm_config_db#(int)::set(this,"sample_env0", "num_masters", <%= num_of_masters %>);
+```
+
+with family meta file 'meta/family/base.cfg':
+
+```ruby
+num_of_masters = 1
+```
+
+and generates target file 'out/src/verif/uvc/sample/sample_test_lib.sv' with content:
+
+```verilog
+uvm_config_db#(int)::set(this,"sample_env0", "num_masters", 1);
+```
 
 **Benefit:** better flexibility and neater source code control.
 
@@ -235,7 +257,11 @@ for case simulation w.o/w. waveform. The sim log and waveform are stored in dire
   rakefile
 ```
 
-**Benefit:** multiple cases can run simultaneously based on the same snapshot to improve the simulation efficiency.
+If the case option is omitted in run, a default case sample_base_test is used, the same as
+
+> rake run[:sample_base_test ]
+
+Benefit:** multiple cases can run simultaneously based on the same snapshot to improve the simulation efficiency.
 
 #### verdi
 
