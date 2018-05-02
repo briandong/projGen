@@ -13,6 +13,7 @@ To get help on this program:
 > ./proj_gen.rb -h
 
 Usage:   ./proj_gen.rb -n PROJ_NAME -f MODULE_FILE [-t TOP_MODULE] -o OUTPUT_DIR
+
 Example: ./proj_gen.rb -n sample -f sample.v -o ./sampleProj
 
 * -n, --name PROJ_NAME        Specify the project name
@@ -31,8 +32,6 @@ Specify project name "sample", RTL file "sample.v", top module "sample", and gen
 Could omit top module if "sample" is the 1st module defined in RTL file "sample.v":
 > ./proj_gen.rb -n sample -f sample.v -o ./sample
 
-
-
 ------
 
 ## Exploring the Sample Project
@@ -47,7 +46,7 @@ Before running any tasks, the original clean project file structure is:
 ▾ ip/
 ▾ meta/
   ▾ family/
-      base.rb
+      base.info
   ▾ suites/
       base.rb
 ▾ design/
@@ -73,11 +72,13 @@ Before running any tasks, the original clean project file structure is:
 
 ### Meta files
 
-#### Family
+#### family
 
-Family meta files are utilized to define different variants of current project, under directory 'meta/family'.
+The sample project supports family of different variants. 
 
-#### Suites and tests
+Variant variables are defined in family meta files ('meta/family/*.info'), and utilized by task publish.
+
+#### suites (and tests)
 
 All the suite and test information is defined under directory 'meta/suites'.
 
@@ -110,7 +111,7 @@ Every test contains the following information:
 
 *Note: The suites are described in DSL (Domain Specific Language).*
 
-### Tasks Available
+### Tasks
 
 To get the full available task list, just change to sample project directory and type:
 
@@ -159,7 +160,7 @@ IPs are developed as separate projects and organized as nested submodules in thi
 
 **Benefit:** a centralized IP is much easier to maintain than the the same IP scattered in different projects with different versions.
 
-#### publish
+#### publish[family]
 
 All the code is published to 'out/src' directory before use (compile/run). So the project file structure after 
 
@@ -179,6 +180,8 @@ is:
 ▸ verif/
   rakefile
 ```
+
+Note that sample project pareses files with extention .erb using specified family meta file (default is :base).
 
 **Benefit:** better flexibility and neater source code control.
 
@@ -205,7 +208,7 @@ A simulation snapshot will be created in 'out/sim/comp' directory for simulation
   rakefile
 ```
 
-#### simulate
+#### run[case]
 
 Execute 
 
