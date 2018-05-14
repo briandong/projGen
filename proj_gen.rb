@@ -745,7 +745,7 @@ verdi_cmd = cmd_prefix + "verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}
 def run_cmd(type, dir, command)
   mkdir_p dir if !File::directory?(dir)
   cmd = "cd \#{dir} && \#{command}"
-  puts "Running CMD \#{type.to_s.upcase}> \#{cmd}"
+  #puts "Running CMD \#{type.to_s.upcase}> \#{cmd}"
   sh(cmd)
 end
 
@@ -866,30 +866,19 @@ task :publish, [:family] => [:ip] do |t, args|
 end
 
 desc "compile"
-task :compile => [:publish] do
+task :compile, [:dbg] => [:publish] do |t, args|
+  args.with_defaults(:dbg => false)
+  compile_cmd += " +define+FSDB" if args[:dbg]
   run_cmd(:compile, comp_dir, compile_cmd)
 end
 
-desc "compile with debug/waveform"
-task :compile_debug => [:publish] do
-  cmd = compile_cmd + " +define+FSDB"
-  run_cmd(:compile, comp_dir, cmd)
-end
-
 desc "run case"
-task :run, [:case] => [:compile] do |t, args|
+task :run, [:case, :dbg] => [:compile] do |t, args|
   args.with_defaults(:case => :#{@name}_base_test)
+  args.with_defaults(:dbg => false)
   case_dir = sim_dir+"/\#{args[:case].to_s}"
   sim_cmd += " +UVM_TESTNAME=\#{args[:case].to_s}"
-  run_cmd(:run, case_dir, sim_cmd)
-end
-
-desc "run case with debug/waveform"
-task :run_debug, [:case] => [:compile_debug] do |t, args|
-  args.with_defaults(:case => :#{@name}_base_test)
-  case_dir = sim_dir+"/\#{args[:case].to_s}"
-  sim_cmd += " +UVM_TESTNAME=\#{args[:case].to_s}"
-  sim_cmd += " +UVM_CONFIG_DB_TRACE"
+  sim_cmd += " +UVM_CONFIG_DB_TRACE" if args[:dbg]
   run_cmd(:run, case_dir, sim_cmd)
 end
 

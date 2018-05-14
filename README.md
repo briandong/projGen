@@ -121,13 +121,11 @@ Normally the task list looks like:
 
 ```
 rake clean            # clean output
-rake compile          # compile
-rake compile_debug    # compile with debug/waveform
+rake compile[dbg]     # compile
 rake ip               # get IP code (if any)
 rake publish[family]  # publish files
 rake regress          # run regression
-rake run[case]        # run case
-rake run_debug[case]  # run case with debug/waveform
+rake run[case,dbg]    # run case
 rake sanity           # run sanity
 rake verdi            # open verdi
 ```
@@ -207,11 +205,15 @@ uvm_config_db#(int)::set(this,"sample_env0", "num_masters", 1);
 
 **Benefit:** better flexibility and neater source code control.
 
-#### compile
+#### compile[dbg]
 
-A simulation snapshot will be created in 'out/sim/comp' directory for simulation of multiple cases,  after 
+A simulation snapshot will be created in 'out/sim/comp' directory for simulation of multiple cases,  after compile w.o/w. waveform:
 
 > rake compile
+
+or
+
+> rake compile[true]
 
 ```
 ▸ ip/
@@ -230,14 +232,14 @@ A simulation snapshot will be created in 'out/sim/comp' directory for simulation
   rakefile
 ```
 
-#### run[case]
+#### run[case, dbg]
 
 Execute 
 
 > rake run[CASE_NAME]
 
 or 
-> rake run_debug[CASE_NAME]
+> rake run[CASE_NAME, true]
 
 for case simulation w.o/w. waveform. The sim log and waveform are stored in directory 'out/sim/CASE_NAME':
 
