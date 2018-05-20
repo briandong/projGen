@@ -682,6 +682,7 @@ suite :base
   test :#{@name}_base_test
     desc    "The base test for all other tests"
     owner   :smith
+	config  :full
     sanity  true
     regress true
     debug   false
@@ -692,18 +693,19 @@ endsuite
     end
 end
 
-# UVM generator - family class
-# This class is used to generate family file
-class UVM_gen_family < UVM_gen_file
+# UVM generator - config class
+# This class is used to generate config file
+class UVM_gen_config < UVM_gen_file
 
     def initialize(name, file)
         super(name, file)
     end
     
     def to_s
-        s = <<-HEREDOC_FAMILY
+        s = <<-HEREDOC_CONFIG
+dummy = false
 num_of_masters = 1
- 	HEREDOC_FAMILY
+ 	HEREDOC_CONFIG
     end
 end
 
@@ -719,47 +721,37 @@ class UVM_gen_rakefile < UVM_gen_file
 		s = <<-HEREDOC_RAKE
 home_dir   = Dir.pwd
 out_dir    = home_dir+"/out"
-src_dir    = out_dir+"/src"
-ip_dir     = src_dir+"/ip"
-design_dir = src_dir+"/design"
-rtl_dir    = design_dir+"/rtl"
-ver_dir    = src_dir+"/verif"
-sim_dir    = out_dir+"/sim"
-comp_dir   = sim_dir+"/comp"
 
-incdir_list = "+incdir+\#{rtl_dir} +incdir+\#{ver_dir}/tb +incdir+\#{ver_dir}/uvc/#{@name}"
-incdir_list += " +incdir+$UVM_HOME/src $UVM_HOME/src/uvm.sv $UVM_HOME/src/dpi/uvm_dpi.cc"
+incdir_list  = " +incdir+$UVM_HOME/src $UVM_HOME/src/uvm.sv $UVM_HOME/src/dpi/uvm_dpi.cc"
 
 cmd_prefix = "bsub -I "
 
+# irun version
 #compile_cmd = "irun -elaborate \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -top #{@name}_tb_top -64bit -access +rw -uvm -v93 +define+FSDB -l irun_comp_#{@name}.log"
-
-compile_cmd = cmd_prefix + "vcs \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv -sverilog -full64 -debug_access+all -lca -l compile.log"
 #sim_cmd = "irun -R -nclibdirname \#{comp_dir}/INCA_libs \#{incdir_list} -uvm -access +rw -64bit -sv -svseed random -sem2009 +fsdb+autoflush -loadpli1 /cadappl_sde/ictools/verdi/K-2015.09/share/PLI/IUS/LINUX64/libIUS.so -licqueue \#{src_dir}/verif/tb/#{@name}_tb_top.sv -top #{@name}_tb_top +UVM_VERBOSITY=UVM_HIGH"
-
-sim_cmd = cmd_prefix + "../comp/simv +ntb_random_seed_automatic +UVM_VERBOSITY=UVM_HIGH -l sim.log"
-
-verdi_cmd = cmd_prefix + "verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv &"
 
 # Methods
 def run_cmd(type, dir, command)
   mkdir_p dir if !File::directory?(dir)
   cmd = "cd \#{dir} && \#{command}"
-  #puts "Running CMD \#{type.to_s.upcase}> \#{cmd}"
-  sh(cmd)
+  if sh(cmd)
+    puts "**Successfully completed CMD \#{type.to_s.upcase}**"
+  else
+    puts "**Error running CMD \#{type.to_s.upcase}> \#{cmd}**"
+  end
 end
 
 def run_pub(dir, set_file)
   puts "Publishing \#{dir} with \#{set_file}..."
 
-  settings = ""
+  settings = []
   File::open(set_file).each do |l|
-	settings << l.strip.gsub(/\s/,'') #remove white spaces
+	settings << l.strip.gsub(/\\s/,'') #remove white spaces
   end
 
   Dir["\#{dir}/**/*.erb"].each do |f|
     f_target = File.dirname(f)+"/"+File.basename(f, File.extname(f))
-    cmd = "erb \#{settings} \#{f} > \#{f_target} && rm \#{f}"
+	cmd = "erb \#{settings.join " "} \#{f} > \#{f_target} && rm \#{f}"
     puts "Parsing \#{f} => \#{f_target}"
     sh(cmd)
   end
@@ -768,7 +760,7 @@ end
 # Testcases
 # class Testcase definition
 class Testcase
-  attr_accessor :name, :suite, :desc, :owner, :sanity, :regress, :debug
+  attr_accessor :name, :suite, :desc, :owner, :config, :sanity, :regress, :debug
 
   def initialize(name)
     @name = name
@@ -779,7 +771,7 @@ end
 
 @suite_name = nil
 @test_name = nil
-@desc, @owner = nil, nil
+@desc, @owner, @config = nil, nil, nil
 @sanity, @regress, @debug = false, false, false
 
 def gen_test_list
@@ -810,6 +802,10 @@ def owner(name)
   @owner = name
 end
 
+def config(cfg)
+  @config = cfg
+end
+
 def sanity(status = false)
   @sanity = status
 end
@@ -829,6 +825,7 @@ def endtest
   t.suite = @suite_name || "UNKNOWN"
   t.desc = @desc || "UNKNOWN"
   t.owner = @owner || "UNKNOWN"
+  t.config = @config || "UNKNOWN"
   t.sanity = @sanity || false
   t.regress = @regress || false
   t.debug = @debug || false
@@ -855,38 +852,66 @@ task :ip do
 end
 
 desc "publish files"
-task :publish, [:family] => [:ip] do |t, args|
-  args.with_defaults(:family => :base)
-  cmd = "ln -s \#{home_dir}/design \#{src_dir} &&"
-  cmd += "ln -s \#{home_dir}/verif \#{src_dir} &&"
-  cmd += "ln -s \#{home_dir}/ip \#{src_dir}"
-  run_cmd(:publish, src_dir, cmd)
-  run_pub("\#{src_dir}/design", "meta/family/\#{args[:family].to_s}.cfg")
-  run_pub("\#{src_dir}/verif", "meta/family/\#{args[:family].to_s}.cfg")
+task :publish, [:config] => [:ip] do |t, args|
+  args.with_defaults(:config => :full)
+  ocfg_dir = out_dir+"/\#{args[:config].to_s}"
+  osrc_dir = ocfg_dir+"/src"
+  cmd = "ln -s \#{home_dir}/design \#{osrc_dir} &&"
+  cmd += "ln -s \#{home_dir}/verif \#{osrc_dir} &&"
+  cmd += "ln -s \#{home_dir}/ip \#{osrc_dir}"
+  run_cmd(:publish, osrc_dir, cmd)
+  run_pub("\#{osrc_dir}/design", "meta/config/\#{args[:config].to_s}.cfg")
+  run_pub("\#{osrc_dir}/verif", "meta/config/\#{args[:config].to_s}.cfg")
 end
 
 desc "compile"
-task :compile, [:dbg] => [:publish] do |t, args|
+task :compile, [:config, :dbg] => [:publish] do |t, args|
+  args.with_defaults(:config => :full)
   args.with_defaults(:dbg => false)
+  ocfg_dir  = out_dir+"/\#{args[:config].to_s}"
+  osrc_dir  = ocfg_dir+"/src"
+  odes_dir  = osrc_dir+"/design"
+  ortl_dir  = odes_dir+"/rtl"
+  over_dir  = osrc_dir+"/verif"
+  osim_dir  = ocfg_dir+"/sim"
+  ocomp_dir = osim_dir+"/comp"
+  incdir_list += " +incdir+\#{ortl_dir} +incdir+\#{over_dir}/tb +incdir+\#{over_dir}/uvc/#{@name}"
+  compile_cmd = cmd_prefix + "vcs \#{incdir_list} \#{over_dir}/tb/#{@name}_tb_top.sv -sverilog -full64 -debug_access+all -lca -l compile.log"
   compile_cmd += " +define+FSDB" if args[:dbg]
-  run_cmd(:compile, comp_dir, compile_cmd)
+  run_cmd(:compile, ocomp_dir, compile_cmd)
+end
+
+desc "simulation"
+task :sim, [:case, :config, :dbg] => [:compile] do |t, args|
+  args.with_defaults(:case => :#{@name}_base_test)
+  args.with_defaults(:config => :full)
+  args.with_defaults(:dbg => false)
+  ocfg_dir  = out_dir+"/\#{args[:config].to_s}"
+  osrc_dir  = ocfg_dir+"/src"
+  osim_dir  = ocfg_dir+"/sim"
+  ocomp_dir = osim_dir+"/comp"
+  ocase_dir = osim_dir+"/\#{args[:case].to_s}"
+  sim_cmd = cmd_prefix + "\#{ocomp_dir}/simv +ntb_random_seed_automatic +UVM_VERBOSITY=UVM_HIGH -l sim.log"
+  sim_cmd += " +UVM_TESTNAME=\#{args[:case].to_s}"
+  sim_cmd += " +UVM_CONFIG_DB_TRACE" if args[:dbg]
+  run_cmd(:run, ocase_dir, sim_cmd)
 end
 
 desc "run case"
-task :run, [:case, :dbg] => [:compile] do |t, args|
-  args.with_defaults(:case => :#{@name}_base_test)
+task :run, [:dbg] do |t, args|
   args.with_defaults(:dbg => false)
-  case_dir = sim_dir+"/\#{args[:case].to_s}"
-  sim_cmd += " +UVM_TESTNAME=\#{args[:case].to_s}"
-  sim_cmd += " +UVM_CONFIG_DB_TRACE" if args[:dbg]
-  run_cmd(:run, case_dir, sim_cmd)
+  case_list = args.extras
+  gen_test_list
+  @test_list.each do |t|
+	Rake::Task[:sim].invoke(t.name, t.config, args[:dbg]) if case_list.include? t.name
+  end
 end
 
 desc "run sanity"
 task :sanity do
   gen_test_list
   @test_list.each do |t|
-	Rake::Task[:run].invoke(t.name) if (t.sanity && !t.debug)
+	Rake::Task[:sim].invoke(t.name, t.config) if (t.sanity && !t.debug)
   end
 end
 
@@ -894,12 +919,17 @@ desc "run regression"
 task :regress do
   gen_test_list
   @test_list.each do |t|
-	Rake::Task[:run].invoke(t.name) if (t.sanity && !t.debug)
+	Rake::Task[:sim].invoke(t.name, t.config) if (t.regress && !t.debug)
   end
 end
 
 desc "open verdi"
-task :verdi do
+task :verdi, [:config] do
+  ocfg_dir  = out_dir+"/\#{args[:config].to_s}"
+  osrc_dir  = ocfg_dir+"/src"
+  over_dir  = osrc_dir+"/verif"
+  incdir_list += " +incdir+\#{ortl_dir} +incdir+\#{over_dir}/tb +incdir+\#{over_dir}/uvc/#{@name}"
+  verdi_cmd = cmd_prefix + "verdi -sv -uvm \#{incdir_list} \#{ver_dir}/tb/#{@name}_tb_top.sv &"
   run_cmd(:verdi, sim_dir, verdi_cmd)
 end
 
@@ -924,7 +954,7 @@ if __FILE__ == $0
     optparse = OptionParser.new do |opts|
         # Set a banner displayed at the top of the help screen
         opts.banner = "Usage:   ./proj_gen.rb -n PROJ_NAME -f MODULE_FILE [-t TOP_MODULE] -o OUTPUT_DIR\n"
-		opts.banner += "Example: ./proj_gen.rb -n sample -f sample.v -o ./sampleProj"
+		opts.banner += "Example: ./proj_gen.rb -n sample -f sample.v.erb -o ./sampleProj"
     
         # Define the env name
         options[:env_name] = nil
@@ -1057,7 +1087,7 @@ if __FILE__ == $0
 
     # Gen meta files
 	FileUtils.mkdir_p out_dir+"/meta/suites" if !File::directory?(out_dir+"/meta/suites")
-	FileUtils.mkdir_p out_dir+"/meta/family" if !File::directory?(out_dir+"/meta/family")
+	FileUtils.mkdir_p out_dir+"/meta/config" if !File::directory?(out_dir+"/meta/config")
 
 	# Copy RTL file
 	FileUtils.mkdir_p out_dir+"/design/rtl" if !File::directory?(out_dir+"/design/rtl")
@@ -1129,9 +1159,9 @@ if __FILE__ == $0
     suite = UVM_gen_suite.new(env_name, out_dir+"/meta/suites/base.rb")
     suite.to_f
 
-    # Gen the suite file
-    suite = UVM_gen_family.new(env_name, out_dir+"/meta/family/base.cfg")
-    suite.to_f
+    # Gen the config file
+    config = UVM_gen_config.new(env_name, out_dir+"/meta/config/full.cfg")
+    config.to_f
 
     # Gen the rakefile
     rakefile = UVM_gen_rakefile.new(env_name, out_dir+"/rakefile")

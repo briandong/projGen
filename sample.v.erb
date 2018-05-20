@@ -11,4 +11,10 @@ input rst;
 input data_i;
 output data_o;
 
+<% if dummy %>
+data_o = 1'b0;
+<% else %>
+data_o = data_i;
+<% end %>
+
 endmodule
