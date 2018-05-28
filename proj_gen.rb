@@ -119,7 +119,7 @@ class #{@name}_item extends uvm_sequence_item;
     `uvm_field_int(addr, UVM_ALL_ON)
     `uvm_field_int(data, UVM_ALL_ON)
     `uvm_field_int(delay, UVM_ALL_ON)
-  `uvm_object_utils_end\n\n" 
+  `uvm_object_utils_end
 
   // Constructor
   function new (string name = "#{@name}_item");
@@ -327,7 +327,7 @@ class #{@name}_agent extends uvm_agent;
   uvm_sequencer #(#{@name}_item) sequencer;
   #{@name}_driver driver;
   #{@name}_monitor monitor;
-  #
+  
   // Use build_phase to create agents's subcomponents
   virtual function void build_phase(uvm_phase phase);
     super.build_phase(phase);
@@ -856,9 +856,11 @@ task :publish, [:config] => [:ip] do |t, args|
   args.with_defaults(:config => :full)
   ocfg_dir = out_dir+"/\#{args[:config].to_s}"
   osrc_dir = ocfg_dir+"/src"
-  cmd = "ln -s \#{home_dir}/design \#{osrc_dir} &&"
-  cmd += "ln -s \#{home_dir}/verif \#{osrc_dir} &&"
-  cmd += "ln -s \#{home_dir}/ip \#{osrc_dir}"
+  #cmd = "ln -s \#{home_dir}/design \#{osrc_dir} &&"
+  #cmd += "ln -s \#{home_dir}/verif \#{osrc_dir} &&"
+  #cmd += "ln -s \#{home_dir}/ip \#{osrc_dir}"
+  cmd  = "cp -r \#{home_dir}/design \#{osrc_dir} &&"
+  cmd += "cp -r \#{home_dir}/verif \#{osrc_dir} "
   run_cmd(:publish, osrc_dir, cmd)
   run_pub("\#{osrc_dir}/design", "meta/config/\#{args[:config].to_s}.cfg")
   run_pub("\#{osrc_dir}/verif", "meta/config/\#{args[:config].to_s}.cfg")
@@ -1148,7 +1150,8 @@ if __FILE__ == $0
 	Dir.mkdir out_dir+"/verif/tb" if !File::directory?(out_dir+"/verif/tb")
 
     # Gen the tb top
-	dut_file = options[:mod_file].split('/')[-1]
+	dut_file = File.basename options[:mod_file]
+	dut_file = File.basename(dut_file, File.extname(dut_file)) if File.extname(dut_file) == ".erb"
     tb_top = UVM_gen_tb_top.new(env_name, out_dir+"/verif/tb/"+env_name+"_tb_top.sv", port_list, dut_file, top_mod)
 	tb_top.to_f
 
